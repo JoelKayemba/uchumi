@@ -17,6 +17,7 @@ import { BubbleCard } from '@/src/components/dashboard/bubble-card';
 import { DonutLegend, MonthDonut } from '@/src/components/dashboard/month-donut';
 import { QuickActionTile } from '@/src/components/dashboard/quick-action-tile';
 import { WeekBars } from '@/src/components/dashboard/week-bars';
+import { AdBannerSlot } from '@/src/components/ad-banner-slot';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { tipForDay } from '@/src/constants/financial-tips';
 import { computeAvailable } from '@/src/domain/balance';
@@ -341,6 +342,8 @@ export default function DashboardScreen() {
           </View>
           <Text style={styles.tipBody}>{tip}</Text>
         </BubbleCard>
+
+        <AdBannerSlot />
       </ScrollView>
     </UchumiScreen>
   );

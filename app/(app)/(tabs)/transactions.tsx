@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AdBannerSlot } from '@/src/components/ad-banner-slot';
 import { TransactionRow } from '@/src/components/transaction-row';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { filterByPeriod, type StatsPeriod } from '@/src/domain/stats';
@@ -157,6 +158,7 @@ export default function TransactionsScreen() {
             onDelete={deleteTransaction}
           />
         )}
+        ListFooterComponent={<AdBannerSlot />}
       />
     </UchumiScreen>
   );

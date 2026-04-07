@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { AppLockGate } from '@/src/components/app-lock-gate';
 import { useStoreHydrated } from '@/src/hooks/use-store-hydrated';
+import { initMobileAdsSdk } from '@/src/services/ads-init';
 import {
   configureNotificationHandler,
   syncReminderFromStore,
@@ -41,6 +42,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (hydrated) {
       SplashScreen.hideAsync().catch(() => {});
+      initMobileAdsSdk();
     }
   }, [hydrated]);
 

@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AdBannerSlot } from '@/src/components/ad-banner-slot';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import {
   CURRENCY_OPTIONS,
@@ -353,6 +354,8 @@ export default function SettingsScreen() {
           onPress={replayOnboarding}>
           <Text style={styles.linkLabel}>Revoir l’introduction (onboarding)</Text>
         </Pressable>
+
+        <AdBannerSlot />
       </ScrollView>
 
       <Modal
