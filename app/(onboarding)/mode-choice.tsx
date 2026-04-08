@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { useAppStore } from '@/src/store/use-app-store';
@@ -10,6 +11,7 @@ import { colors } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
 
 export default function ModeChoiceScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const setAppMode = useAppStore((s) => s.setAppMode);
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
@@ -22,6 +24,16 @@ export default function ModeChoiceScreen() {
 
   return (
     <UchumiScreen style={styles.container}>
+      <LinearGradient
+        colors={['transparent', 'rgba(237,232,255,0.35)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { top: -insets.top - 8 },
+        ]}
+        pointerEvents="none"
+      />
       <Text style={styles.kicker}>Étape 2 / 2</Text>
       <Text style={styles.title}>Comment utilisez-vous UCHUMI ?</Text>
       <Text style={styles.subtitle}>
@@ -39,7 +51,7 @@ export default function ModeChoiceScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.card}>
             <View style={styles.cardIcon}>
-              <Ionicons name="person" size={28} color={colors.textPrimary} />
+              <Ionicons name="person" size={28} color={colors.textOnDark} />
             </View>
             <Text style={styles.cardTitle}>Personnel</Text>
             <Text style={styles.cardDesc}>
@@ -47,7 +59,7 @@ export default function ModeChoiceScreen() {
             </Text>
             <View style={styles.cardFooter}>
               <Text style={styles.cardCta}>Continuer</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.accent} />
+              <Ionicons name="chevron-forward" size={18} color={colors.lime} />
             </View>
           </LinearGradient>
         </Pressable>
@@ -61,7 +73,7 @@ export default function ModeChoiceScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.card}>
             <View style={styles.cardIcon}>
-              <Ionicons name="briefcase" size={28} color={colors.textPrimary} />
+              <Ionicons name="briefcase" size={28} color={colors.textOnDark} />
             </View>
             <Text style={styles.cardTitle}>Activité</Text>
             <Text style={styles.cardDesc}>
@@ -69,7 +81,7 @@ export default function ModeChoiceScreen() {
             </Text>
             <View style={styles.cardFooter}>
               <Text style={styles.cardCta}>Continuer</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.accent} />
+              <Ionicons name="chevron-forward" size={18} color={colors.lime} />
             </View>
           </LinearGradient>
         </Pressable>
@@ -133,12 +145,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.textPrimary,
+    color: colors.textOnDark,
   },
   cardDesc: {
     fontSize: 14,
     lineHeight: 21,
-    color: 'rgba(244,241,238,0.75)',
+    color: colors.textOnDarkSecondary,
   },
   cardFooter: {
     flexDirection: 'row',
@@ -150,6 +162,6 @@ const styles = StyleSheet.create({
   cardCta: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.accent,
+    color: colors.lime,
   },
 });

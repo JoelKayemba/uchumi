@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -16,6 +15,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  SilkyModalize,
+  type ModalizeRef,
+} from '@/src/components/silky-modalize';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { MARKET_INDEX_SYMBOLS } from '@/src/constants/market-indices';
 import {
@@ -27,7 +30,7 @@ import {
   type MarketQuote,
 } from '@/src/services/market-quotes';
 import { useAppStore } from '@/src/store/use-app-store';
-import { colors } from '@/src/theme';
+import { colors, TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
 
 function formatPrice(price: number, currency: string): string {
@@ -103,7 +106,7 @@ export default function MarketsScreen() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
+  const symbolModalRef = useRef<ModalizeRef>(null);
   const [draftSymbol, setDraftSymbol] = useState('');
 
   const load = useCallback(async () => {
@@ -179,7 +182,7 @@ export default function MarketsScreen() {
       return;
     }
     setDraftSymbol('');
-    setModalOpen(false);
+    symbolModalRef.current?.close();
   };
 
   return (
@@ -187,7 +190,7 @@ export default function MarketsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: insets.bottom + 88 },
+          { paddingBottom: insets.bottom + TAB_BAR_FLOAT_BOTTOM_OFFSET },
         ]}
         refreshControl={
           <RefreshControl
@@ -203,7 +206,7 @@ export default function MarketsScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Ionicons name="pulse" size={28} color={colors.textPrimary} />
+            <Ionicons name="pulse" size={28} color={colors.textOnDark} />
           </View>
           <Text style={styles.title}>Marchés</Text>
           <Text style={styles.sub}>
@@ -234,7 +237,7 @@ export default function MarketsScreen() {
         <View style={styles.watchHeader}>
           <Text style={styles.section}>Ma liste</Text>
           <Pressable
-            onPress={() => setModalOpen(true)}
+            onPress={() => symbolModalRef.current?.open()}
             style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}>
             <Ionicons name="add" size={22} color={colors.textPrimary} />
           </Pressable>
@@ -260,42 +263,38 @@ export default function MarketsScreen() {
         </View>
       </ScrollView>
 
-      <Modal
-        visible={modalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalOpen(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setModalOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Ajouter un symbole</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ex. NVDA, EURUSD=X"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="characters"
-              value={draftSymbol}
-              onChangeText={setDraftSymbol}
-              onSubmitEditing={submitAdd}
-            />
-            <View style={styles.modalActions}>
-              <Pressable onPress={() => setModalOpen(false)}>
-                <Text style={styles.modalCancel}>Annuler</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  if (!draftSymbol.trim()) {
-                    Alert.alert('Symbole', 'Saisissez un symbole (ex. AAPL).');
-                    return;
-                  }
-                  submitAdd();
-                }}
-                style={({ pressed }) => [styles.modalOk, pressed && styles.pressed]}>
-                <Text style={styles.modalOkText}>Ajouter</Text>
-              </Pressable>
-            </View>
+      <SilkyModalize
+        ref={symbolModalRef}
+        adjustToContentHeight
+        onClosed={() => setDraftSymbol('')}
+        scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}>
+        <Text style={styles.modalTitle}>Ajouter un symbole</Text>
+        <TextInput
+          style={styles.modalInput}
+          placeholder="Ex. NVDA, EURUSD=X"
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="characters"
+          value={draftSymbol}
+          onChangeText={setDraftSymbol}
+          onSubmitEditing={submitAdd}
+        />
+        <View style={styles.modalActions}>
+          <Pressable onPress={() => symbolModalRef.current?.close()}>
+            <Text style={styles.modalCancel}>Annuler</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+          <Pressable
+            onPress={() => {
+              if (!draftSymbol.trim()) {
+                Alert.alert('Symbole', 'Saisissez un symbole (ex. AAPL).');
+                return;
+              }
+              submitAdd();
+            }}
+            style={({ pressed }) => [styles.modalOk, pressed && styles.pressed]}>
+            <Text style={styles.modalOkText}>Ajouter</Text>
+          </Pressable>
+        </View>
+      </SilkyModalize>
     </UchumiScreen>
   );
 }
@@ -327,14 +326,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: colors.textPrimary,
+    color: colors.textOnDark,
     letterSpacing: -0.4,
   },
   sub: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 19,
-    color: 'rgba(244,241,238,0.65)',
+    color: colors.textOnDarkMuted,
   },
   loader: {
     alignItems: 'center',
@@ -439,19 +438,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
     paddingVertical: spacing.md,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: colors.dune,
-    borderRadius: 20,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.fuscousGray,
   },
   modalTitle: {
     fontSize: 18,

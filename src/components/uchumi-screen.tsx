@@ -11,8 +11,14 @@ type UchumiScreenProps = {
 };
 
 export function UchumiScreen({ children, style }: UchumiScreenProps) {
+  const flat = style ? StyleSheet.flatten(style) : undefined;
+  const pageBg =
+    flat && typeof flat.backgroundColor === 'string'
+      ? flat.backgroundColor
+      : colors.marshland;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: pageBg }]} edges={['top', 'left', 'right']}>
       <View style={[styles.inner, style]}>{children}</View>
     </SafeAreaView>
   );

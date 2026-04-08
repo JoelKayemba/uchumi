@@ -61,7 +61,7 @@ export async function pickAndImportUchumiJson(): Promise<void> {
     if (!parsedResult.success) {
       Alert.alert(
         'Format non reconnu',
-        'Ce fichier ne correspond pas à un export UCHUMI (v1 ou v2).'
+        'Ce fichier ne correspond pas à un export UCHUMI (v1 à v3).'
       );
       return;
     }
@@ -109,9 +109,32 @@ export async function pickAndImportUchumiJson(): Promise<void> {
               loans: Array.isArray(rawObj.loans)
                 ? (rawObj.loans as import('@/src/types/loan').Loan[])
                 : undefined,
+              subscriptions: Array.isArray(rawObj.subscriptions)
+                ? (rawObj.subscriptions as import('@/src/types/subscription').Subscription[])
+                : undefined,
               marketWatchlist: Array.isArray(rawObj.marketWatchlist)
                 ? (rawObj.marketWatchlist as string[])
                 : undefined,
+              appLockEnabled:
+                typeof rawObj.appLockEnabled === 'boolean'
+                  ? rawObj.appLockEnabled
+                  : undefined,
+              weeklySummaryEnabled:
+                typeof rawObj.weeklySummaryEnabled === 'boolean'
+                  ? rawObj.weeklySummaryEnabled
+                  : undefined,
+              weeklySummaryWeekday:
+                typeof rawObj.weeklySummaryWeekday === 'number'
+                  ? rawObj.weeklySummaryWeekday
+                  : undefined,
+              weeklySummaryHour:
+                typeof rawObj.weeklySummaryHour === 'number'
+                  ? rawObj.weeklySummaryHour
+                  : undefined,
+              weeklySummaryMinute:
+                typeof rawObj.weeklySummaryMinute === 'number'
+                  ? rawObj.weeklySummaryMinute
+                  : undefined,
             });
             Alert.alert('Import terminé', 'Vos données ont été mises à jour.');
           },

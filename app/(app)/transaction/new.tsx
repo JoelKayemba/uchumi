@@ -13,6 +13,7 @@ export default function NewTransactionScreen() {
 
   return (
     <TransactionForm
+      headerTitle="Nouveau mouvement"
       submitLabel="Enregistrer"
       initialIsoCurrency={currencyOptionToIso(currency)}
       onSubmit={async (values) => {

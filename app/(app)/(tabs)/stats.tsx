@@ -1,10 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BubbleCard } from '@/src/components/dashboard/bubble-card';
+import { ScreenHeader } from '@/src/components/screen-header';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { compareLastTwoMonths } from '@/src/domain/month-compare';
 import {
@@ -15,7 +22,8 @@ import {
 } from '@/src/domain/stats';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
-import { colors } from '@/src/theme';
+import { finShell } from '@/src/theme/fin-shell';
+import { TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
 
 const PERIODS: { key: StatsPeriod; label: string }[] = [
@@ -24,10 +32,19 @@ const PERIODS: { key: StatsPeriod; label: string }[] = [
   { key: 'all', label: 'Tout' },
 ];
 
+const VIVA = [
+  finShell.purple,
+  finShell.blue,
+  finShell.green,
+  finShell.orange,
+];
+
 export default function StatsScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const formatCurrency = useFormatCurrency();
   const [period, setPeriod] = useState<StatsPeriod>('month');
+  const [search, setSearch] = useState('');
   const transactions = useAppStore((s) => s.transactions);
   const categories = useAppStore((s) => s.categories);
 
@@ -40,77 +57,110 @@ export default function StatsScreen() {
     () => aggregateOutflowByCategory(filtered, categories),
     [filtered, categories]
   );
-  const maxOut = useMemo(
-    () => Math.max(...byCategory.map((r) => r.total), 1),
-    [byCategory]
-  );
+  const totalOut = totals.expense + totals.savings;
 
   const monthCompare = useMemo(
     () => compareLastTwoMonths(transactions),
     [transactions]
   );
+  const netDelta = monthCompare.netCurrent - monthCompare.netPrevious;
+
+  const top4 = useMemo(() => {
+    const sorted = [...byCategory].sort((a, b) => b.total - a.total);
+    return sorted.slice(0, 4);
+  }, [byCategory]);
+
+  const barFlex = useMemo(() => {
+    const sum = top4.reduce((a, r) => a + r.total, 0) || 1;
+    return top4.map((r) => ({ ...r, flex: r.total / sum }));
+  }, [top4]);
 
   const hasAny = filtered.length > 0;
-  const netDelta =
-    monthCompare.netCurrent - monthCompare.netPrevious;
+
+  const listPreview = useMemo(() => {
+    const out = filtered
+      .filter((t) => t.kind === 'expense' || t.kind === 'savings')
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    const q = search.trim().toLowerCase();
+    const sliced = q
+      ? out.filter((t) => t.label.toLowerCase().includes(q))
+      : out;
+    return sliced.slice(0, 12);
+  }, [filtered, search]);
 
   return (
-    <UchumiScreen style={styles.wrap}>
+    <UchumiScreen style={styles.screen}>
+      <ScreenHeader title="Analyse des dépenses" />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: insets.bottom + 88 },
+          { paddingBottom: insets.bottom + TAB_BAR_FLOAT_BOTTOM_OFFSET },
         ]}
-        showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['#3a3540', '#252228']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="analytics" size={26} color={colors.textPrimary} />
-          </View>
-          <Text style={styles.title}>Statistiques</Text>
-          <Text style={styles.subtitle}>
-            Synthèse des flux et répartition par catégorie.
-          </Text>
-        </LinearGradient>
-
-        <View style={styles.periodRow}>
-          {PERIODS.map(({ key, label }) => (
-            <Pressable
-              key={key}
-              onPress={() => setPeriod(key)}
-              style={[
-                styles.periodChip,
-                period === key && styles.periodChipActive,
-              ]}>
-              <Text
-                style={[
-                  styles.periodText,
-                  period === key && styles.periodTextActive,
-                ]}>
-                {label}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTop}>
+            <View>
+              <Text style={styles.summaryLabel}>Total sorties</Text>
+              <Text style={styles.summaryTotal}>
+                {hasAny ? formatCurrency(totalOut) : '—'}
               </Text>
-            </Pressable>
-          ))}
+              <Text style={styles.summaryHint}>
+                Dépenses + épargne sur la période sélectionnée.
+              </Text>
+            </View>
+            <View style={styles.pieBadge}>
+              <Ionicons name="pie-chart" size={26} color={finShell.purple} />
+            </View>
+          </View>
+
+          <View style={styles.periodRow}>
+            {PERIODS.map(({ key, label }) => {
+              const on = period === key;
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => setPeriod(key)}
+                  style={[styles.periodChip, on && styles.periodChipOn]}>
+                  <Text style={[styles.periodText, on && styles.periodTextOn]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {top4.length > 0 ? (
+            <View style={styles.segmentBar}>
+              {barFlex.map((row, i) => (
+                <View
+                  key={String(row.categoryId)}
+                  style={[
+                    styles.segment,
+                    {
+                      flex: row.flex,
+                      backgroundColor: VIVA[i % VIVA.length],
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
 
         {transactions.length > 0 ? (
-          <BubbleCard variant="deep">
-            <Text style={styles.section}>Ce mois vs mois dernier</Text>
-            <Text style={styles.compareHint}>
-              Comparaison sur les mois civils complets (tous vos mouvements).
-            </Text>
+          <View style={styles.compareCard}>
+            <Text style={styles.compareTitle}>Ce mois vs mois dernier</Text>
             <View style={styles.compareGrid}>
               <View style={styles.compareCell}>
                 <Text style={styles.compareLabel}>Solde net (ce mois)</Text>
                 <Text
                   style={[
                     styles.compareValue,
-                    monthCompare.netCurrent >= 0
-                      ? styles.positive
-                      : styles.negative,
+                    monthCompare.netCurrent >= 0 ? styles.pos : styles.neg,
                   ]}>
                   {monthCompare.netCurrent >= 0 ? '+' : '−'}
                   {formatCurrency(Math.abs(monthCompare.netCurrent))}
@@ -121,299 +171,403 @@ export default function StatsScreen() {
                 <Text
                   style={[
                     styles.compareValue,
-                    monthCompare.netPrevious >= 0
-                      ? styles.positive
-                      : styles.negative,
+                    monthCompare.netPrevious >= 0 ? styles.pos : styles.neg,
                   ]}>
                   {monthCompare.netPrevious >= 0 ? '+' : '−'}
                   {formatCurrency(Math.abs(monthCompare.netPrevious))}
                 </Text>
               </View>
             </View>
-            <View style={styles.compareDeltaRow}>
+            <View style={styles.deltaRow}>
               <Ionicons
                 name={netDelta >= 0 ? 'trending-up' : 'trending-down'}
-                size={20}
-                color={netDelta >= 0 ? colors.success : colors.danger}
+                size={18}
+                color={netDelta >= 0 ? finShell.green : finShell.orange}
               />
-              <Text style={styles.compareDeltaText}>
+              <Text style={styles.deltaText}>
                 {netDelta >= 0 ? '+' : '−'}
-                {formatCurrency(Math.abs(netDelta))} par rapport au mois précédent
+                {formatCurrency(Math.abs(netDelta))} vs mois précédent
               </Text>
             </View>
-          </BubbleCard>
+          </View>
         ) : null}
 
-        {!hasAny ? (
-          <BubbleCard>
-            <Text style={styles.empty}>
-              Aucun mouvement sur cette période. Enregistrez des entrées ou des
-              dépenses depuis l’onglet Mouvements.
+        <Text style={styles.blockTitle}>Par catégorie</Text>
+        <View style={styles.catGrid}>
+          {(byCategory.length ? byCategory.slice(0, 4) : []).map((row, i) => (
+            <View
+              key={String(row.categoryId)}
+              style={[
+                styles.catCard,
+                { borderColor: (row.color || VIVA[i % VIVA.length]) + '55' },
+              ]}>
+              <View
+                style={[
+                  styles.catDot,
+                  { backgroundColor: row.color || VIVA[i % VIVA.length] },
+                ]}
+              />
+              <Text style={styles.catName} numberOfLines={2}>
+                {row.name}
+              </Text>
+              <Text style={styles.catAmt}>{formatCurrency(row.total)}</Text>
+            </View>
+          ))}
+          {byCategory.length === 0 ? (
+            <Text style={styles.emptyHint}>
+              Aucune sortie sur cette période.
             </Text>
-          </BubbleCard>
-        ) : (
-          <>
-            <BubbleCard variant="accent">
-              <Text style={styles.section}>Totaux sur la période</Text>
-              <View style={styles.totalsInner}>
-                <View style={styles.totalBubble}>
-                  <Ionicons name="arrow-up-circle" size={22} color={colors.success} />
-                  <Text style={styles.totalLabel}>Entrées</Text>
-                  <Text style={[styles.totalValue, styles.positive]}>
-                    +{formatCurrency(totals.income)}
-                  </Text>
-                </View>
-                <View style={styles.totalBubble}>
-                  <Ionicons name="arrow-down-circle" size={22} color={colors.danger} />
-                  <Text style={styles.totalLabel}>Dépenses</Text>
-                  <Text style={[styles.totalValue, styles.negative]}>
-                    −{formatCurrency(totals.expense)}
-                  </Text>
-                </View>
-                <View style={styles.totalBubble}>
-                  <Ionicons name="albums" size={20} color={colors.accent} />
-                  <Text style={styles.totalLabel}>Épargne</Text>
-                  <Text style={[styles.totalValue, styles.negative]}>
-                    −{formatCurrency(totals.savings)}
-                  </Text>
-                </View>
-              </View>
-            </BubbleCard>
+          ) : null}
+        </View>
 
-            <BubbleCard variant="deep">
-              <Text style={styles.section}>Dépenses + épargne par catégorie</Text>
-              {byCategory.length === 0 ? (
-                <Text style={styles.emptyHint}>
-                  Aucune sortie catégorisée sur cette période.
-                </Text>
-              ) : (
-                <View style={styles.catBlock}>
-                  {byCategory.map((row) => (
-                    <View key={String(row.categoryId)} style={styles.catRow}>
-                      <View style={styles.catHeader}>
-                        <View
-                          style={[styles.dot, { backgroundColor: row.color }]}
-                        />
-                        <Text style={styles.catName} numberOfLines={1}>
-                          {row.name}
-                        </Text>
-                        <Text style={styles.catAmount}>
-                          {formatCurrency(row.total)}
-                        </Text>
-                      </View>
-                      <View style={styles.barTrack}>
-                        <View
-                          style={[
-                            styles.barFill,
-                            {
-                              width: `${(row.total / maxOut) * 100}%`,
-                              backgroundColor: row.color,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </BubbleCard>
-          </>
-        )}
+        <View style={styles.insight}>
+          <Ionicons name="pricetag-outline" size={22} color={finShell.orange} />
+          <Text style={styles.insightText}>
+            Astuce : classez vos mouvements pour affiner les prévisions et
+            l’historique par catégorie.
+          </Text>
+          <Pressable onPress={() => router.push('/categories')}>
+            <Text style={styles.insightLink}>Catégories ›</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.blockTitle}>Flux sur la période</Text>
+        <View style={styles.totalsRow}>
+          <View style={styles.tCell}>
+            <Text style={styles.tLabel}>Entrées</Text>
+            <Text style={[styles.tVal, styles.pos]}>+{formatCurrency(totals.income)}</Text>
+          </View>
+          <View style={styles.tCell}>
+            <Text style={styles.tLabel}>Dépenses</Text>
+            <Text style={[styles.tVal, styles.neg]}>−{formatCurrency(totals.expense)}</Text>
+          </View>
+          <View style={styles.tCell}>
+            <Text style={styles.tLabel}>Épargne</Text>
+            <Text style={[styles.tVal, styles.neg]}>−{formatCurrency(totals.savings)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={20} color={finShell.muted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Filtrer les mouvements récents…"
+            placeholderTextColor={finShell.muted}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+
+        {listPreview.map((t) => (
+          <Pressable
+            key={t.id}
+            onPress={() => router.push(`/transaction/${t.id}`)}
+            style={({ pressed }) => [styles.txRow, pressed && styles.pressed]}>
+            <View style={styles.txIcon}>
+              <Ionicons
+                name={t.kind === 'savings' ? 'albums-outline' : 'cart-outline'}
+                size={20}
+                color={finShell.ink}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.txTitle} numberOfLines={1}>
+                {t.label}
+              </Text>
+              <Text style={styles.txSub} numberOfLines={1}>
+                {t.kind === 'expense' ? 'Dépense' : 'Épargne'}
+              </Text>
+            </View>
+            <Text style={styles.txAmt}>
+              −{formatCurrency(t.amountInDisplayCurrency)}
+            </Text>
+          </Pressable>
+        ))}
+
+        <Pressable
+          onPress={() => router.push('/insights/past-expenses')}
+          style={({ pressed }) => [styles.moreLink, pressed && styles.pressed]}>
+          <Text style={styles.moreLinkText}>Voir les insights 7 jours ›</Text>
+        </Pressable>
       </ScrollView>
     </UchumiScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
+  screen: {
     flex: 1,
-    paddingTop: spacing.md,
+    backgroundColor: finShell.page,
+    paddingTop: spacing.sm,
   },
-  scroll: {
-    gap: spacing.md,
-  },
-  hero: {
-    borderRadius: 22,
+  scroll: { gap: spacing.md },
+  summaryCard: {
+    backgroundColor: finShell.card,
+    borderRadius: 28,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    marginBottom: spacing.xs,
+    borderColor: finShell.border,
   },
-  heroIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  summaryTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  summaryLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: finShell.muted,
+  },
+  summaryTotal: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: finShell.ink,
+    letterSpacing: -0.8,
+    marginTop: 4,
+  },
+  summaryHint: {
+    fontSize: 12,
+    color: finShell.sub,
+    marginTop: 6,
+    lineHeight: 17,
+  },
+  pieBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: 'rgba(138,112,245,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: 'rgba(244,241,238,0.65)',
-    marginTop: 6,
-    lineHeight: 20,
   },
   periodRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    marginTop: spacing.lg,
   },
   periodChip: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 14,
-    backgroundColor: colors.dune,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: finShell.barTrack,
     borderWidth: 1,
-    borderColor: colors.fuscousGray,
+    borderColor: 'transparent',
   },
-  periodChipActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.fuscousGray,
+  periodChipOn: {
+    backgroundColor: finShell.ink,
+    borderColor: finShell.ink,
   },
   periodText: {
-    color: colors.textMuted,
-    fontWeight: '700',
     fontSize: 14,
+    fontWeight: '700',
+    color: finShell.sub,
   },
-  periodTextActive: {
-    color: colors.textPrimary,
+  periodTextOn: {
+    color: '#FFFFFF',
   },
-  compareHint: {
-    fontSize: 13,
-    color: colors.textMuted,
-    lineHeight: 18,
-    marginBottom: spacing.md,
+  segmentBar: {
+    flexDirection: 'row',
+    height: 10,
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginTop: spacing.lg,
+    backgroundColor: finShell.barTrack,
+  },
+  segment: {
+    height: '100%',
+  },
+  compareCard: {
+    backgroundColor: finShell.card,
+    borderRadius: 22,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: finShell.border,
+    gap: spacing.sm,
+  },
+  compareTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: finShell.ink,
   },
   compareGrid: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginBottom: spacing.md,
   },
   compareCell: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: finShell.barTrack,
     borderRadius: 14,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
   },
   compareLabel: {
-    fontSize: 12,
-    color: colors.textMuted,
+    fontSize: 11,
+    color: finShell.muted,
     fontWeight: '600',
-    marginBottom: 6,
   },
   compareValue: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
+    marginTop: 6,
     fontVariant: ['tabular-nums'],
   },
-  compareDeltaRow: {
+  pos: { color: finShell.green },
+  neg: { color: finShell.orange },
+  deltaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    gap: 8,
+    paddingTop: spacing.xs,
   },
-  compareDeltaText: {
+  deltaText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: finShell.sub,
     flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textSecondary,
   },
-  section: {
-    fontSize: 12,
+  blockTitle: {
+    fontSize: 18,
     fontWeight: '800',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-    marginBottom: spacing.md,
+    color: finShell.ink,
+    marginTop: spacing.xs,
   },
-  totalsInner: {
-    gap: spacing.sm,
-  },
-  totalBubble: {
+  catGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 14,
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  catCard: {
+    width: '48%',
+    backgroundColor: finShell.card,
+    borderRadius: 20,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    gap: 8,
   },
-  totalLabel: {
-    flex: 1,
-    color: colors.textSecondary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  totalValue: {
-    fontSize: 17,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  positive: {
-    color: colors.success,
-  },
-  negative: {
-    color: colors.danger,
-  },
-  empty: {
-    color: colors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  emptyHint: {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  catBlock: {
-    gap: spacing.md,
-  },
-  catRow: {
-    gap: spacing.xs,
-  },
-  catHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  dot: {
+  catDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
   },
   catName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: finShell.ink,
+    minHeight: 36,
+  },
+  catAmt: {
+    fontSize: 16,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+    color: finShell.ink,
+  },
+  emptyHint: {
+    width: '100%',
+    color: finShell.muted,
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  insight: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: finShell.insightBg,
+    borderRadius: 18,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: finShell.insightBorder,
+  },
+  insightText: {
     flex: 1,
-    color: colors.textPrimary,
-    fontSize: 15,
+    fontSize: 13,
+    lineHeight: 19,
+    color: finShell.sub,
     fontWeight: '600',
   },
-  catAmount: {
-    color: colors.textSecondary,
-    fontSize: 15,
+  insightLink: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: finShell.ink,
+  },
+  totalsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  tCell: {
+    flex: 1,
+    backgroundColor: finShell.card,
+    borderRadius: 16,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: finShell.border,
+  },
+  tLabel: {
+    fontSize: 11,
+    color: finShell.muted,
     fontWeight: '700',
+  },
+  tVal: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 6,
     fontVariant: ['tabular-nums'],
   },
-  barTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.marshland,
-    overflow: 'hidden',
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: finShell.barTrack,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
   },
-  barFill: {
-    height: '100%',
-    borderRadius: 4,
-    opacity: 0.88,
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: finShell.ink,
   },
+  txRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: 18,
+    backgroundColor: finShell.card,
+    borderWidth: 1,
+    borderColor: finShell.border,
+  },
+  txIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: finShell.barTrack,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  txTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: finShell.ink,
+  },
+  txSub: {
+    fontSize: 12,
+    color: finShell.muted,
+    marginTop: 2,
+  },
+  txAmt: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: finShell.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  moreLink: {
+    alignSelf: 'center',
+    paddingVertical: spacing.sm,
+  },
+  moreLinkText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: finShell.purple,
+  },
+  pressed: { opacity: 0.92 },
 });

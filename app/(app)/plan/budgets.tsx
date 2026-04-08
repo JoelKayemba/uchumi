@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/src/components/screen-header';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { spendInCategoryThisMonth } from '@/src/domain/budgets';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
@@ -56,6 +57,7 @@ export default function BudgetsScreen() {
 
   return (
     <UchumiScreen style={styles.wrap}>
+      <ScreenHeader title="Budgets" />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -121,7 +123,7 @@ export default function BudgetsScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, paddingTop: spacing.sm },
-  scroll: { paddingHorizontal: spacing.md, gap: spacing.md },
+  scroll: { gap: spacing.md },
   intro: {
     color: colors.textMuted,
     fontSize: 14,

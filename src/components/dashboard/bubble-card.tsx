@@ -1,13 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { type ReactNode } from 'react';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { colors } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
 
 type BubbleCardProps = {
   children: ReactNode;
   style?: ViewStyle;
-  /** Variante visuelle (dégradé de fond). */
+  /** Variante visuelle. */
   variant?: 'default' | 'accent' | 'deep';
 };
 
@@ -15,9 +16,9 @@ const GRADIENTS: Record<
   NonNullable<BubbleCardProps['variant']>,
   readonly [string, string]
 > = {
-  default: ['#2A2624', '#1A1816'],
-  accent: ['#3D3632', '#252220'],
-  deep: ['#1E2A28', '#121816'],
+  default: ['#FFFFFF', '#FAFAFC'],
+  accent: ['#FFFFFF', '#F0FDF4'],
+  deep: ['#FFFFFF', '#F7F5FC'],
 };
 
 export function BubbleCard({ children, style, variant = 'default' }: BubbleCardProps) {
@@ -39,7 +40,19 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.fuscousGray,
+    backgroundColor: colors.dune,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   gradient: {
     padding: spacing.lg,

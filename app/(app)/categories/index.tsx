@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -15,6 +14,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  SilkyModalize,
+  type ModalizeRef,
+} from '@/src/components/silky-modalize';
+import { ScreenHeader } from '@/src/components/screen-header';
+import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { useAppStore } from '@/src/store/use-app-store';
 import type { Category } from '@/src/types/category';
 import { colors } from '@/src/theme';
@@ -27,24 +32,27 @@ export default function CategoriesScreen() {
   const updateCategory = useAppStore((s) => s.updateCategory);
   const deleteCategory = useAppStore((s) => s.deleteCategory);
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const categoryModalRef = useRef<ModalizeRef>(null);
   const [draftName, setDraftName] = useState('');
   const [editing, setEditing] = useState<Category | null>(null);
 
   const openAdd = () => {
     setEditing(null);
     setDraftName('');
-    setModalOpen(true);
+    categoryModalRef.current?.open();
   };
 
   const openEdit = (cat: Category) => {
     setEditing(cat);
     setDraftName(cat.name);
-    setModalOpen(true);
+    categoryModalRef.current?.open();
   };
 
   const closeModal = () => {
-    setModalOpen(false);
+    categoryModalRef.current?.close();
+  };
+
+  const onCategoryModalClosed = () => {
     setDraftName('');
     setEditing(null);
   };
@@ -76,17 +84,19 @@ export default function CategoriesScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.page}>
+    <UchumiScreen style={styles.flex}>
+      <ScreenHeader title="Catégories" />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.page}>
         <LinearGradient
           colors={['#353a42', '#22262c']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Ionicons name="pricetags" size={26} color={colors.textPrimary} />
+            <Ionicons name="pricetags" size={26} color={colors.textOnDark} />
           </View>
           <Text style={styles.heroTitle}>Organisez vos sorties</Text>
           <Text style={styles.heroSub}>
@@ -103,7 +113,7 @@ export default function CategoriesScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.addGrad}>
-            <Ionicons name="add-circle-outline" size={22} color={colors.textPrimary} />
+            <Ionicons name="add-circle-outline" size={22} color={colors.textOnDark} />
             <Text style={styles.addMainLabel}>Nouvelle catégorie</Text>
           </LinearGradient>
         </Pressable>
@@ -136,57 +146,54 @@ export default function CategoriesScreen() {
         />
       </View>
 
-      <Modal
-        visible={modalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={closeModal}>
-        <Pressable style={styles.modalOverlay} onPress={closeModal}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.modalHeader}>
-              <Ionicons
-                name={editing ? 'create' : 'add-circle'}
-                size={24}
-                color={colors.accent}
-              />
-              <Text style={styles.modalTitle}>
-                {editing ? 'Renommer la catégorie' : 'Nouvelle catégorie'}
-              </Text>
-            </View>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Nom"
-              placeholderTextColor={colors.textMuted}
-              value={draftName}
-              onChangeText={setDraftName}
-              autoFocus
-              onSubmitEditing={saveModal}
+      <SilkyModalize
+        ref={categoryModalRef}
+        adjustToContentHeight
+        childrenStyle={{ gap: spacing.sm }}
+        onClosed={onCategoryModalClosed}
+        scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}>
+        <View style={styles.modalHeader}>
+            <Ionicons
+              name={editing ? 'create' : 'add-circle'}
+              size={24}
+              color={colors.accent}
             />
-            <View style={styles.modalActions}>
-              <Pressable onPress={closeModal} style={styles.modalCancel}>
-                <Text style={styles.modalCancelText}>Annuler</Text>
-              </Pressable>
-              <Pressable
-                onPress={saveModal}
-                disabled={!draftName.trim()}
-                style={({ pressed }) => [
-                  styles.modalSave,
-                  !draftName.trim() && styles.modalSaveDisabled,
-                  pressed && draftName.trim() && styles.pressed,
-                ]}>
-                <LinearGradient
-                  colors={['#5a6a62', '#3d4a42']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.modalSaveGrad}>
-                  <Text style={styles.modalSaveText}>Enregistrer</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </KeyboardAvoidingView>
+            <Text style={styles.modalTitle}>
+              {editing ? 'Renommer la catégorie' : 'Nouvelle catégorie'}
+            </Text>
+          </View>
+          <TextInput
+            style={styles.modalInput}
+            placeholder="Nom"
+            placeholderTextColor={colors.textMuted}
+            value={draftName}
+            onChangeText={setDraftName}
+            onSubmitEditing={saveModal}
+          />
+          <View style={styles.modalActions}>
+            <Pressable onPress={closeModal} style={styles.modalCancel}>
+              <Text style={styles.modalCancelText}>Annuler</Text>
+            </Pressable>
+            <Pressable
+              onPress={saveModal}
+              disabled={!draftName.trim()}
+              style={({ pressed }) => [
+                styles.modalSave,
+                !draftName.trim() && styles.modalSaveDisabled,
+                pressed && draftName.trim() && styles.pressed,
+              ]}>
+              <LinearGradient
+                colors={['#5a6a62', '#3d4a42']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.modalSaveGrad}>
+                <Text style={styles.modalSaveText}>Enregistrer</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+      </SilkyModalize>
+      </KeyboardAvoidingView>
+    </UchumiScreen>
   );
 }
 
@@ -197,8 +204,7 @@ const styles = StyleSheet.create({
   },
   page: {
     flex: 1,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.xs,
   },
   hero: {
     borderRadius: 20,
@@ -219,14 +225,14 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.textPrimary,
+    color: colors.textOnDark,
     letterSpacing: -0.3,
   },
   heroSub: {
     marginTop: 6,
     fontSize: 14,
     lineHeight: 20,
-    color: 'rgba(244,241,238,0.65)',
+    color: colors.textOnDarkMuted,
   },
   addMain: {
     borderRadius: 16,
@@ -243,7 +249,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
   },
   addMainLabel: {
-    color: colors.textPrimary,
+    color: colors.textOnDark,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -277,19 +283,6 @@ const styles = StyleSheet.create({
   },
   iconBtn: {
     padding: 6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: colors.dune,
-    borderRadius: 20,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.fuscousGray,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -341,7 +334,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   modalSaveText: {
-    color: colors.textPrimary,
+    color: colors.textOnDark,
     fontSize: 16,
     fontWeight: '800',
   },

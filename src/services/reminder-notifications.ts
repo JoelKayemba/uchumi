@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { NOTIF_HREF } from '@/src/constants/notification-routes';
 import {
   UCHUMI_ANDROID_CHANNEL_ID,
   UCHUMI_DAILY_REMINDER_ID,
@@ -52,6 +53,7 @@ export async function scheduleUchumiDailyReminder(
       title: 'Rappel UCHUMI — saisie du jour',
       body:
         'Enregistrez au moins un mouvement (entrée, dépense ou épargne) pour garder votre budget à jour.',
+      data: { href: NOTIF_HREF.newMovement },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,

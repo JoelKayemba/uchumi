@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,12 +12,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AdBannerSlot } from '@/src/components/ad-banner-slot';
 import { TransactionRow } from '@/src/components/transaction-row';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { filterByPeriod, type StatsPeriod } from '@/src/domain/stats';
 import { useAppStore } from '@/src/store/use-app-store';
-import { colors } from '@/src/theme';
+import { finShell } from '@/src/theme/fin-shell';
+import { TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
 
 const PERIODS: { key: StatsPeriod; label: string }[] = [
@@ -68,56 +68,51 @@ export default function TransactionsScreen() {
     filteredList.length === 0 && transactions.length > 0;
 
   return (
-    <UchumiScreen style={styles.container}>
-      <LinearGradient
-        colors={['#353a42', '#22262c']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}>
+    <UchumiScreen style={styles.screen}>
+      <View style={styles.hero}>
+        <View style={styles.heroTab} />
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.heroIcon}>
-              <Ionicons name="reader" size={24} color={colors.textPrimary} />
+              <Ionicons name="reader" size={24} color={finShell.purple} />
             </View>
             <View>
+              <Text style={styles.kicker}>Journal</Text>
               <Text style={styles.title}>Mouvements</Text>
-              <Text style={styles.sub}>Journal des entrées et sorties</Text>
+              <Text style={styles.sub}>Entrées, dépenses et épargne</Text>
             </View>
           </View>
           <Pressable
             onPress={() => router.push('/transaction/new')}
-            style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}>
-            <Ionicons name="add" size={22} color={colors.textPrimary} />
+            style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
+            accessibilityLabel="Nouveau mouvement">
+            <Ionicons name="add" size={26} color="#FFFFFF" />
           </Pressable>
         </View>
-      </LinearGradient>
+      </View>
 
       <View style={styles.periodRow}>
-        {PERIODS.map(({ key, label }) => (
-          <Pressable
-            key={key}
-            onPress={() => setPeriod(key)}
-            style={[
-              styles.periodChip,
-              period === key && styles.periodChipActive,
-            ]}>
-            <Text
-              style={[
-                styles.periodText,
-                period === key && styles.periodTextActive,
-              ]}>
-              {label}
-            </Text>
-          </Pressable>
-        ))}
+        {PERIODS.map(({ key, label }) => {
+          const on = period === key;
+          return (
+            <Pressable
+              key={key}
+              onPress={() => setPeriod(key)}
+              style={[styles.periodChip, on && styles.periodChipOn]}>
+              <Text style={[styles.periodText, on && styles.periodTextOn]}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color={colors.textMuted} />
+        <Ionicons name="search" size={20} color={finShell.muted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Rechercher libellé, note, tag, catégorie…"
-          placeholderTextColor={colors.textMuted}
+          placeholder="Libellé, note, tag, catégorie…"
+          placeholderTextColor={finShell.muted}
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
@@ -127,7 +122,7 @@ export default function TransactionsScreen() {
       </View>
 
       <View style={styles.hintRow}>
-        <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+        <Ionicons name="information-circle-outline" size={16} color={finShell.muted} />
         <Text style={styles.hint}>
           Touchez une ligne pour modifier · appui long pour supprimer.
         </Text>
@@ -139,15 +134,15 @@ export default function TransactionsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: insets.bottom + 88 },
+          { paddingBottom: insets.bottom + TAB_BAR_FLOAT_BOTTOM_OFFSET },
         ]}
         ListEmptyComponent={
           <Text style={styles.empty}>
             {emptyBecauseFilter
               ? search.trim()
-                ? 'Aucun résultat pour cette recherche. Essayez d’autres mots ou effacez le champ.'
-                : 'Aucun mouvement sur cette période. Changez le filtre ou enregistrez un nouveau mouvement.'
-              : 'Aucun mouvement pour l’instant. Touchez + pour en créer un.'}
+                ? 'Aucun résultat pour cette recherche.'
+                : 'Aucun mouvement sur cette période.'
+              : 'Aucun mouvement pour l’instant. Utilisez le bouton + ou l’accueil pour en créer un.'}
           </Text>
         }
         renderItem={({ item }) => (
@@ -158,28 +153,50 @@ export default function TransactionsScreen() {
             onDelete={deleteTransaction}
           />
         )}
-        ListFooterComponent={<AdBannerSlot />}
       />
     </UchumiScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: spacing.md,
+  screen: {
     flex: 1,
+    backgroundColor: finShell.page,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   hero: {
-    borderRadius: 20,
+    borderRadius: 28,
     padding: spacing.md,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    backgroundColor: finShell.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: finShell.border,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.07,
+        shadowRadius: 16,
+      },
+      android: { elevation: 3 },
+    }),
+  },
+  heroTab: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 6,
+    backgroundColor: finShell.purple,
+    opacity: 0.85,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -187,80 +204,95 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     flex: 1,
   },
+  kicker: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: finShell.muted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
   heroIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(138,112,245,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
-    color: colors.textPrimary,
-    letterSpacing: -0.3,
+    color: finShell.ink,
+    letterSpacing: -0.4,
   },
   sub: {
     fontSize: 12,
-    color: 'rgba(244,241,238,0.55)',
+    color: finShell.sub,
     marginTop: 2,
   },
   addBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: finShell.ink,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: { elevation: 6 },
+    }),
   },
   addBtnPressed: {
-    opacity: 0.85,
+    opacity: 0.88,
+    transform: [{ scale: 0.97 }],
   },
   periodRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   periodChip: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: 14,
-    backgroundColor: colors.dune,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: finShell.barTrack,
     borderWidth: 1,
-    borderColor: colors.fuscousGray,
+    borderColor: 'transparent',
   },
-  periodChipActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.fuscousGray,
+  periodChipOn: {
+    backgroundColor: finShell.ink,
+    borderColor: finShell.ink,
   },
   periodText: {
-    color: colors.textMuted,
+    color: finShell.sub,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 14,
   },
-  periodTextActive: {
-    color: colors.textPrimary,
+  periodTextOn: {
+    color: '#FFFFFF',
   },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingVertical: 12,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    borderRadius: 16,
-    backgroundColor: colors.dune,
+    borderRadius: 18,
+    backgroundColor: finShell.barTrack,
     borderWidth: 1,
-    borderColor: colors.fuscousGray,
+    borderColor: finShell.border,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    color: colors.textPrimary,
+    fontSize: 16,
+    color: finShell.ink,
     paddingVertical: 4,
   },
   hintRow: {
@@ -273,7 +305,7 @@ const styles = StyleSheet.create({
   hint: {
     flex: 1,
     fontSize: 12,
-    color: colors.textMuted,
+    color: finShell.muted,
     lineHeight: 17,
   },
   listFlex: {
@@ -281,11 +313,14 @@ const styles = StyleSheet.create({
   },
   list: {
     flexGrow: 1,
+    paddingTop: spacing.xs,
   },
   empty: {
-    color: colors.textMuted,
+    color: finShell.muted,
     fontSize: 15,
     lineHeight: 22,
     marginTop: spacing.lg,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
   },
 });

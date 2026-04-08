@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
@@ -15,16 +16,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/src/components/screen-header';
 import {
-  CURRENCY_OPTIONS,
   currencyOptionToIso,
+  getSortedCurrencyOptions,
   type CurrencyOptionId,
 } from '@/src/constants/currencies';
 import { useAppStore } from '@/src/store/use-app-store';
 import type { TransactionKind } from '@/src/types/transaction';
-import { colors } from '@/src/theme';
+import { finShell } from '@/src/theme/fin-shell';
 import { spacing } from '@/src/theme/spacing';
 
 const KINDS: { kind: TransactionKind; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -32,6 +34,18 @@ const KINDS: { kind: TransactionKind; label: string; icon: keyof typeof Ionicons
   { kind: 'expense', label: 'Dépense', icon: 'trending-down' },
   { kind: 'savings', label: 'Épargne', icon: 'albums' },
 ];
+
+const KIND_BORDER: Record<TransactionKind, string> = {
+  income: finShell.green,
+  expense: finShell.orange,
+  savings: finShell.purple,
+};
+
+const KIND_BG: Record<TransactionKind, string> = {
+  income: 'rgba(0,200,83,0.12)',
+  expense: 'rgba(255,109,0,0.1)',
+  savings: 'rgba(138,112,245,0.14)',
+};
 
 /**
  * Ne garde que chiffres et séparateurs (ignore espaces invisibles, symboles €, etc.).
@@ -118,11 +132,11 @@ type TransactionFormProps = {
   initialNote?: string;
   initialAttachmentUri?: string | null;
   onSubmit: (values: TransactionFormValues) => void | Promise<void>;
+  /** Titre + bouton retour (navigation sans header natif). */
+  headerTitle?: string;
 };
 
-const currencyChips = [
-  ...new Map(CURRENCY_OPTIONS.map((o) => [o.iso4217, o])).values(),
-];
+const currencyChips = getSortedCurrencyOptions();
 
 export function TransactionForm({
   submitLabel,
@@ -135,7 +149,9 @@ export function TransactionForm({
   initialNote = '',
   initialAttachmentUri = null,
   onSubmit,
+  headerTitle,
 }: TransactionFormProps) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const categories = useAppStore((s) => s.categories);
   const displayCurrency = useAppStore((s) => s.currency as CurrencyOptionId);
@@ -215,31 +231,35 @@ export function TransactionForm({
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}>
-      <View style={styles.layout}>
-        <ScrollView
+    <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}>
+        <View style={styles.layout}>
+          {headerTitle ? (
+            <ScreenHeader title={headerTitle} onBack={() => router.back()} />
+          ) : null}
+          <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           style={styles.scrollFlex}
           showsVerticalScrollIndicator={false}>
           <LinearGradient
-            colors={['#343d48', '#232a32', '#1a1f24']}
+            colors={['#FFFFFF', finShell.page]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.hero}>
-            <View style={styles.heroAccentLine} />
+            <View style={styles.heroTab} />
             <Text style={styles.heroKicker}>Montant</Text>
             <Text style={styles.heroHintTop}>
-              Touchez le champ ci-dessous — chiffres uniquement (virgule ou point pour les centimes).
+              Saisie libre : chiffres, virgule ou point pour les centimes.
             </Text>
             <View style={styles.amountRow}>
               <TextInput
                 style={styles.amountInput}
                 placeholder="0"
-                placeholderTextColor="rgba(244,241,238,0.35)"
+                placeholderTextColor={finShell.muted}
                 keyboardType={
                   Platform.OS === 'ios'
                     ? 'numbers-and-punctuation'
@@ -272,11 +292,17 @@ export function TransactionForm({
             <Pressable
               key={k}
               onPress={() => setKind(k)}
-              style={[styles.kindChip, kind === k && styles.kindChipActive]}>
+              style={[
+                styles.kindChip,
+                kind === k && {
+                  borderColor: KIND_BORDER[k],
+                  backgroundColor: KIND_BG[k],
+                },
+              ]}>
               <Ionicons
                 name={icon}
                 size={18}
-                color={kind === k ? colors.textPrimary : colors.textMuted}
+                color={kind === k ? finShell.ink : finShell.muted}
               />
               <Text
                 style={[styles.kindText, kind === k && styles.kindTextActive]}>
@@ -290,7 +316,7 @@ export function TransactionForm({
         <View style={styles.currencyWrap}>
           {currencyChips.map((opt) => (
             <Pressable
-              key={opt.iso4217}
+              key={opt.id}
               onPress={() => setIsoCurrency(opt.iso4217)}
               style={[
                 styles.currencyChip,
@@ -303,7 +329,7 @@ export function TransactionForm({
                   isoCurrency.toUpperCase() === opt.iso4217.toUpperCase() &&
                     styles.currencyChipTextActive,
                 ]}>
-                {opt.iso4217}
+                {opt.icon} {opt.iso4217}
               </Text>
             </Pressable>
           ))}
@@ -317,7 +343,7 @@ export function TransactionForm({
         <TextInput
           style={styles.input}
           placeholder="Ex. Courses du marché"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={finShell.muted}
           value={label}
           onChangeText={setLabel}
         />
@@ -363,7 +389,7 @@ export function TransactionForm({
         <TextInput
           style={styles.input}
           placeholder="travail, urgent…"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={finShell.muted}
           value={tagsLine}
           onChangeText={setTagsLine}
         />
@@ -372,7 +398,7 @@ export function TransactionForm({
         <TextInput
           style={[styles.input, styles.noteInput]}
           placeholder="Détails, contexte…"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={finShell.muted}
           value={note}
           onChangeText={setNote}
           multiline
@@ -383,7 +409,7 @@ export function TransactionForm({
           <Pressable
             onPress={() => void pickImage()}
             style={({ pressed }) => [styles.attachBtn, pressed && styles.pressed]}>
-            <Ionicons name="image-outline" size={22} color={colors.textPrimary} />
+            <Ionicons name="image-outline" size={22} color={finShell.ink} />
             <Text style={styles.attachLabel}>Choisir une photo</Text>
           </Pressable>
           {attachmentUri ? (
@@ -419,23 +445,29 @@ export function TransactionForm({
             <LinearGradient
               colors={
                 canSave
-                  ? ['#5a7a82', '#3d5a62']
-                  : ['#4a4540', '#353230']
+                  ? [finShell.purple, '#6B52D8']
+                  : ['#D8D8E0', '#C8C8D4']
               }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.save}>
               {saving ? (
-                <ActivityIndicator color={colors.textPrimary} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
                   <Ionicons
                     name="checkmark-circle"
                     size={22}
-                    color={colors.textPrimary}
+                    color={canSave ? '#FFFFFF' : finShell.muted}
                     style={styles.saveIcon}
                   />
-                  <Text style={styles.saveLabel}>{submitLabel}</Text>
+                  <Text
+                    style={[
+                      styles.saveLabel,
+                      !canSave && styles.saveLabelMuted,
+                    ]}>
+                    {submitLabel}
+                  </Text>
                 </>
               )}
             </LinearGradient>
@@ -447,15 +479,16 @@ export function TransactionForm({
             </Text>
           ) : null}
         </View>
-      </View>
-    </KeyboardAvoidingView>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: colors.marshland,
+    backgroundColor: finShell.page,
   },
   layout: {
     flex: 1,
@@ -469,34 +502,32 @@ const styles = StyleSheet.create({
   },
   hero: {
     position: 'relative',
-    borderRadius: 22,
+    borderRadius: 28,
     padding: spacing.lg,
     marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: finShell.border,
     overflow: 'hidden',
   },
-  heroAccentLine: {
+  heroTab: {
     position: 'absolute',
     left: 0,
+    right: 0,
     top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: 'rgba(122,158,122,0.75)',
-    borderTopLeftRadius: 22,
-    borderBottomLeftRadius: 22,
+    height: 6,
+    backgroundColor: finShell.purple,
   },
   heroKicker: {
     fontSize: 11,
     fontWeight: '800',
-    color: colors.textMuted,
+    color: finShell.muted,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: spacing.xs,
   },
   heroHintTop: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: finShell.sub,
     lineHeight: 19,
     marginBottom: spacing.md,
     opacity: 0.95,
@@ -509,7 +540,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 42,
     fontWeight: '800',
-    color: colors.textPrimary,
+    color: finShell.ink,
     fontVariant: ['tabular-nums'],
     letterSpacing: -1,
     padding: 0,
@@ -519,16 +550,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     fontSize: 14,
     fontWeight: '700',
-    color: colors.success,
+    color: finShell.green,
   },
   amountError: {
     marginTop: spacing.sm,
     fontSize: 13,
-    color: colors.danger,
+    color: finShell.orange,
     lineHeight: 18,
   },
   section: {
-    color: colors.textMuted,
+    color: finShell.muted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -547,22 +578,19 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: 16,
-    backgroundColor: '#2c2826',
+    borderRadius: 18,
+    backgroundColor: finShell.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  kindChipActive: {
-    borderColor: 'rgba(122,158,122,0.55)',
-    backgroundColor: 'rgba(122,158,122,0.12)',
+    borderColor: finShell.border,
   },
   kindText: {
-    color: colors.textMuted,
+    color: finShell.muted,
     fontSize: 15,
     fontWeight: '600',
   },
   kindTextActive: {
-    color: colors.textPrimary,
+    color: finShell.ink,
+    fontWeight: '800',
   },
   currencyWrap: {
     flexDirection: 'row',
@@ -573,35 +601,35 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: 14,
-    backgroundColor: '#2c2826',
+    backgroundColor: finShell.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: finShell.border,
   },
   currencyChipActive: {
-    borderColor: 'rgba(168,159,150,0.5)',
-    backgroundColor: 'rgba(168,159,150,0.1)',
+    borderColor: finShell.purple,
+    backgroundColor: 'rgba(138,112,245,0.1)',
   },
   currencyChipText: {
-    color: colors.textMuted,
+    color: finShell.muted,
     fontSize: 14,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
   currencyChipTextActive: {
-    color: colors.textPrimary,
+    color: finShell.ink,
   },
   currencyHint: {
-    color: colors.textMuted,
+    color: finShell.muted,
     fontSize: 12,
     lineHeight: 16,
     marginTop: spacing.xs,
   },
   input: {
-    backgroundColor: '#2c2826',
-    borderRadius: 16,
+    backgroundColor: finShell.card,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    color: colors.textPrimary,
+    borderColor: finShell.border,
+    color: finShell.ink,
     fontSize: 17,
     paddingHorizontal: spacing.md,
     paddingVertical: Platform.OS === 'ios' ? 14 : 12,
@@ -620,20 +648,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: 20,
-    backgroundColor: colors.dune,
+    backgroundColor: finShell.card,
     borderWidth: 1,
-    borderColor: colors.fuscousGray,
+    borderColor: finShell.border,
   },
   catChipActive: {
-    borderColor: colors.accent,
+    borderColor: finShell.purple,
+    backgroundColor: 'rgba(138,112,245,0.08)',
   },
   catText: {
-    color: colors.textSecondary,
+    color: finShell.sub,
     fontSize: 14,
   },
   catTextActive: {
-    color: colors.textPrimary,
-    fontWeight: '600',
+    color: finShell.ink,
+    fontWeight: '700',
   },
   attachRow: {
     flexDirection: 'row',
@@ -644,15 +673,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.dune,
+    backgroundColor: finShell.card,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.fuscousGray,
+    borderColor: finShell.border,
   },
   attachLabel: {
-    color: colors.textPrimary,
+    color: finShell.ink,
     fontWeight: '700',
     fontSize: 15,
   },
@@ -660,7 +689,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   clearPhotoText: {
-    color: colors.danger,
+    color: finShell.orange,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -675,22 +704,22 @@ const styles = StyleSheet.create({
   },
   footer: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: colors.marshland,
+    borderTopColor: finShell.border,
+    backgroundColor: finShell.page,
     paddingHorizontal: spacing.md,
   },
   footerHint: {
     marginTop: spacing.sm,
     textAlign: 'center',
     fontSize: 12,
-    color: colors.textMuted,
+    color: finShell.muted,
     lineHeight: 17,
   },
   saveOuter: {
-    borderRadius: 18,
+    borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: finShell.border,
   },
   saveMuted: {
     opacity: 0.92,
@@ -713,8 +742,11 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   saveLabel: {
-    color: colors.textPrimary,
+    color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '800',
+  },
+  saveLabelMuted: {
+    color: finShell.sub,
   },
 });

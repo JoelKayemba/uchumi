@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 
+import { NOTIF_HREF } from '@/src/constants/notification-routes';
 import { computeAvailable } from '@/src/domain/balance';
 import { formatCurrency } from '@/src/lib/format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
@@ -45,6 +46,7 @@ export async function checkLowBalanceAfterTransactionsChange(): Promise<void> {
     content: {
       title: 'UCHUMI — Fond faible',
       body: `Solde disponible : ${formatCurrency(available, currency)} (seuil : ${formatCurrency(lowBalanceThreshold, currency)}).`,
+      data: { href: NOTIF_HREF.home },
     },
     trigger: null,
   });

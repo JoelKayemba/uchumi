@@ -1,6 +1,5 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
@@ -9,29 +8,25 @@ type QuickActionTileProps = {
   label: string;
   onPress: () => void;
   icon: ReactNode;
-  colorsGrad: readonly [string, string];
+  /** Conservé pour compat ; optionnel (accent léger). */
+  colorsGrad?: readonly [string, string];
 };
 
 export function QuickActionTile({
   label,
   onPress,
   icon,
-  colorsGrad,
 }: QuickActionTileProps) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [styles.press, pressed && styles.pressed]}>
-      <LinearGradient
-        colors={[...colorsGrad]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.tile}>
+      <View style={styles.tile}>
         <View style={styles.iconWrap}>{icon}</View>
         <Text style={styles.label} numberOfLines={2}>
           {label}
         </Text>
-      </LinearGradient>
+      </View>
     </Pressable>
   );
 }
@@ -54,8 +49,20 @@ const styles = StyleSheet.create({
     minHeight: 96,
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.fuscousGray,
     borderRadius: 18,
+    backgroundColor: colors.dune,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   iconWrap: {
     marginBottom: spacing.sm,

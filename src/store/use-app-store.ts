@@ -21,6 +21,8 @@ import type { Category } from '@/src/types/category';
 import type { Loan } from '@/src/types/loan';
 import type { RecurringRule } from '@/src/types/recurring';
 import type { SavingsGoal } from '@/src/types/savings-goal';
+import type { Subscription } from '@/src/types/subscription';
+import type { NotificationLogEntry } from '@/src/types/notification-log';
 import type { Transaction } from '@/src/types/transaction';
 
 const STORAGE_KEY = 'uchumi-app-v1';
@@ -36,12 +38,19 @@ type ImportPayload = {
   savingsGoals?: SavingsGoal[];
   recurringRules?: RecurringRule[];
   loans?: Loan[];
+  subscriptions?: Subscription[];
   marketWatchlist?: string[];
   appLockEnabled?: boolean;
+  weeklySummaryEnabled?: boolean;
+  weeklySummaryWeekday?: number;
+  weeklySummaryHour?: number;
+  weeklySummaryMinute?: number;
 };
 
 type AppState = {
   hasCompletedOnboarding: boolean;
+  /** Une fois à true, on ne redemande pas la modale « Autoriser les notifications ». */
+  hasSeenNotificationPermissionPrompt: boolean;
   appMode: AppMode | null;
   currency: CurrencyOptionId;
   transactions: Transaction[];
@@ -60,7 +69,15 @@ type AppState = {
   savingsGoals: SavingsGoal[];
   recurringRules: RecurringRule[];
   loans: Loan[];
+  subscriptions: Subscription[];
   appLockEnabled: boolean;
+  weeklySummaryEnabled: boolean;
+  /** 1 = dimanche … 7 = samedi (Expo). */
+  weeklySummaryWeekday: number;
+  weeklySummaryHour: number;
+  weeklySummaryMinute: number;
+  /** Historique léger des notifications reçues (app au premier plan). */
+  notificationLog: NotificationLogEntry[];
   setAppMode: (mode: AppMode) => void;
   setCurrency: (currency: CurrencyOptionId) => void;
   setReminderPreferences: (
@@ -71,9 +88,35 @@ type AppState = {
   setLowBalancePreferences: (enabled: boolean, threshold: number | null) => void;
   setLastLowBalanceNotificationDay: (day: string | null) => void;
   setAppLockEnabled: (enabled: boolean) => void;
+  setWeeklySummaryPreferences: (
+    enabled: boolean,
+    weekday?: number,
+    hour?: number,
+    minute?: number
+  ) => void;
   importAppData: (payload: ImportPayload) => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
+  setHasSeenNotificationPermissionPrompt: (seen: boolean) => void;
+  appendNotificationLog: (e: {
+    title: string;
+    body: string;
+    href?: string;
+  }) => void;
+  clearNotificationLog: () => void;
+  /** Supprime tous les mouvements (libère l’espace principal). */
+  clearTransactions: () => void;
+  clearCategoryBudgets: () => void;
+  clearSavingsGoals: () => void;
+  clearRecurringRules: () => void;
+  clearLoans: () => void;
+  clearSubscriptions: () => void;
+  clearMarketWatchlist: () => void;
+  /**
+   * Remet à zéro tout le contenu financier local (mouvements, plans, objectifs, liste marché, journal notif).
+   * Conserve devise, rappels, onboarding, préférences d’alerte.
+   */
+  purgeAllFinancialData: () => void;
   addTransaction: (input: Omit<Transaction, 'id' | 'createdAt'>) => void;
   updateTransaction: (
     id: string,
@@ -110,6 +153,9 @@ type AppState = {
   addLoan: (input: Omit<Loan, 'id'>) => void;
   updateLoan: (id: string, patch: Partial<Loan>) => void;
   deleteLoan: (id: string) => void;
+  addSubscription: (input: Omit<Subscription, 'id'>) => void;
+  updateSubscription: (id: string, patch: Partial<Subscription>) => void;
+  deleteSubscription: (id: string) => void;
 };
 
 function ensureCategories(list: Category[]): Category[] {
@@ -119,12 +165,16 @@ function ensureCategories(list: Category[]): Category[] {
   return list;
 }
 
+/** Anciens identifiants (liste de devises plus large) → équivalent actuel. */
+const LEGACY_CURRENCY_ID: Record<string, CurrencyOptionId> = {
+  generic: 'cdf',
+};
+
 function ensureCurrency(id: unknown): CurrencyOptionId {
-  if (
-    typeof id === 'string' &&
-    CURRENCY_OPTIONS.some((o) => o.id === id)
-  ) {
-    return id as CurrencyOptionId;
+  if (typeof id !== 'string') return DEFAULT_CURRENCY;
+  const normalized = LEGACY_CURRENCY_ID[id] ?? id;
+  if (CURRENCY_OPTIONS.some((o) => o.id === normalized)) {
+    return normalized as CurrencyOptionId;
   }
   return DEFAULT_CURRENCY;
 }
@@ -227,10 +277,93 @@ function ensureLoans(raw: unknown): Loan[] {
     }));
 }
 
+const PRESETS: Subscription['preset'][] = [
+  'custom',
+  'netflix',
+  'spotify',
+  'amazon_prime',
+  'disney',
+  'youtube',
+  'apple',
+  'gym',
+  'phone',
+  'internet',
+  'rent',
+  'electricity',
+  'insurance',
+  'other',
+];
+
+function ensureSubscriptions(raw: unknown): Subscription[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (x): x is Subscription =>
+        x != null && typeof (x as Subscription).id === 'string'
+    )
+    .map((s) => {
+      const legacy = s as {
+        amount?: number;
+        amountInDisplayCurrency?: number;
+        currencyId?: unknown;
+        imageUri?: unknown;
+        isMonthlyRecurring?: boolean;
+      };
+      const legacyDisplay =
+        typeof legacy.amountInDisplayCurrency === 'number' &&
+        Number.isFinite(legacy.amountInDisplayCurrency)
+          ? Math.max(0, legacy.amountInDisplayCurrency)
+          : 0;
+      const amount =
+        typeof legacy.amount === 'number' && Number.isFinite(legacy.amount) && legacy.amount >= 0
+          ? legacy.amount
+          : legacyDisplay;
+      return {
+        id: s.id,
+        name: typeof s.name === 'string' ? s.name : 'Abonnement',
+        amount,
+        currencyId: ensureCurrency(legacy.currencyId),
+        billingDayOfMonth:
+          typeof s.billingDayOfMonth === 'number' &&
+          s.billingDayOfMonth >= 1 &&
+          s.billingDayOfMonth <= 28
+            ? s.billingDayOfMonth
+            : 1,
+        preset:
+          typeof s.preset === 'string' && PRESETS.includes(s.preset as Subscription['preset'])
+            ? (s.preset as Subscription['preset'])
+            : 'custom',
+        isMonthlyRecurring:
+          typeof legacy.isMonthlyRecurring === 'boolean'
+            ? legacy.isMonthlyRecurring
+            : true,
+        categoryId:
+          s.categoryId === null || typeof s.categoryId === 'string'
+            ? s.categoryId
+            : null,
+        remindDaysBefore:
+          typeof s.remindDaysBefore === 'number' &&
+          s.remindDaysBefore >= 0 &&
+          s.remindDaysBefore <= 28
+            ? s.remindDaysBefore
+            : 2,
+        autoRecordExpense: Boolean(s.autoRecordExpense),
+        lastAutoRecordedMonth:
+          typeof s.lastAutoRecordedMonth === 'string' ||
+          s.lastAutoRecordedMonth === null
+            ? s.lastAutoRecordedMonth
+            : null,
+        isActive: s.isActive !== false,
+        notes: typeof s.notes === 'string' ? s.notes : '',
+      };
+    });
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       hasCompletedOnboarding: false,
+      hasSeenNotificationPermissionPrompt: false,
       appMode: null,
       currency: DEFAULT_CURRENCY,
       transactions: [],
@@ -248,7 +381,13 @@ export const useAppStore = create<AppState>()(
       savingsGoals: [],
       recurringRules: [],
       loans: [],
+      subscriptions: [],
       appLockEnabled: false,
+      weeklySummaryEnabled: false,
+      weeklySummaryWeekday: 7,
+      weeklySummaryHour: 19,
+      weeklySummaryMinute: 0,
+      notificationLog: [],
       setAppMode: (mode) => set({ appMode: mode }),
       setCurrency: (currency) => set({ currency }),
       setReminderPreferences: (enabled, hour, minute) =>
@@ -265,6 +404,16 @@ export const useAppStore = create<AppState>()(
       setLastLowBalanceNotificationDay: (day) =>
         set({ lastLowBalanceNotificationDay: day }),
       setAppLockEnabled: (enabled) => set({ appLockEnabled: enabled }),
+      setWeeklySummaryPreferences: (enabled, weekday, hour, minute) =>
+        set((state) => ({
+          weeklySummaryEnabled: enabled,
+          weeklySummaryWeekday:
+            weekday !== undefined ? weekday : state.weeklySummaryWeekday,
+          weeklySummaryHour:
+            hour !== undefined ? hour : state.weeklySummaryHour,
+          weeklySummaryMinute:
+            minute !== undefined ? minute : state.weeklySummaryMinute,
+        })),
       importAppData: (payload) =>
         set((state) => ({
           categories:
@@ -302,6 +451,10 @@ export const useAppStore = create<AppState>()(
             payload.loans !== undefined
               ? ensureLoans(payload.loans)
               : state.loans,
+          subscriptions:
+            payload.subscriptions !== undefined
+              ? ensureSubscriptions(payload.subscriptions)
+              : state.subscriptions,
           marketWatchlist:
             payload.marketWatchlist !== undefined
               ? ensureWatchlist(payload.marketWatchlist)
@@ -310,12 +463,72 @@ export const useAppStore = create<AppState>()(
             typeof payload.appLockEnabled === 'boolean'
               ? payload.appLockEnabled
               : state.appLockEnabled,
+          weeklySummaryEnabled:
+            typeof payload.weeklySummaryEnabled === 'boolean'
+              ? payload.weeklySummaryEnabled
+              : state.weeklySummaryEnabled,
+          weeklySummaryWeekday:
+            typeof payload.weeklySummaryWeekday === 'number'
+              ? payload.weeklySummaryWeekday
+              : state.weeklySummaryWeekday,
+          weeklySummaryHour:
+            typeof payload.weeklySummaryHour === 'number'
+              ? payload.weeklySummaryHour
+              : state.weeklySummaryHour,
+          weeklySummaryMinute:
+            typeof payload.weeklySummaryMinute === 'number'
+              ? payload.weeklySummaryMinute
+              : state.weeklySummaryMinute,
         })),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       resetOnboarding: () =>
         set({
           hasCompletedOnboarding: false,
           appMode: null,
+        }),
+      setHasSeenNotificationPermissionPrompt: (seen) =>
+        set({ hasSeenNotificationPermissionPrompt: seen }),
+      appendNotificationLog: (e) =>
+        set((state) => {
+          const entry: NotificationLogEntry = {
+            id: randomUUID(),
+            title: e.title,
+            body: e.body,
+            receivedAt: new Date().toISOString(),
+            href: e.href,
+          };
+          const next = [entry, ...state.notificationLog].slice(0, 64);
+          return { notificationLog: next };
+        }),
+      clearNotificationLog: () => set({ notificationLog: [] }),
+      clearTransactions: () =>
+        set({
+          transactions: [],
+          streakCount: 0,
+          streakLastDate: null,
+          lastLowBalanceNotificationDay: null,
+        }),
+      clearCategoryBudgets: () => set({ categoryBudgets: {} }),
+      clearSavingsGoals: () => set({ savingsGoals: [] }),
+      clearRecurringRules: () => set({ recurringRules: [] }),
+      clearLoans: () => set({ loans: [] }),
+      clearSubscriptions: () => set({ subscriptions: [] }),
+      clearMarketWatchlist: () =>
+        set({ marketWatchlist: [...DEFAULT_WATCHLIST] }),
+      purgeAllFinancialData: () =>
+        set({
+          transactions: [],
+          categories: [...DEFAULT_CATEGORIES],
+          categoryBudgets: {},
+          savingsGoals: [],
+          recurringRules: [],
+          loans: [],
+          subscriptions: [],
+          streakCount: 0,
+          streakLastDate: null,
+          lastLowBalanceNotificationDay: null,
+          notificationLog: [],
+          marketWatchlist: [...DEFAULT_WATCHLIST],
         }),
       addTransaction: (input) => {
         if (input.amount <= 0 || !Number.isFinite(input.amount)) {
@@ -500,12 +713,31 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           loans: state.loans.filter((l) => l.id !== id),
         })),
+      addSubscription: (input) =>
+        set((state) => ({
+          subscriptions: [
+            ...state.subscriptions,
+            { ...input, id: randomUUID() },
+          ],
+        })),
+      updateSubscription: (id, patch) =>
+        set((state) => ({
+          subscriptions: state.subscriptions.map((s) =>
+            s.id === id ? { ...s, ...patch } : s
+          ),
+        })),
+      deleteSubscription: (id) =>
+        set((state) => ({
+          subscriptions: state.subscriptions.filter((s) => s.id !== id),
+        })),
     }),
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         hasCompletedOnboarding: state.hasCompletedOnboarding,
+        hasSeenNotificationPermissionPrompt:
+          state.hasSeenNotificationPermissionPrompt,
         appMode: state.appMode,
         currency: state.currency,
         transactions: state.transactions,
@@ -523,7 +755,13 @@ export const useAppStore = create<AppState>()(
         savingsGoals: state.savingsGoals,
         recurringRules: state.recurringRules,
         loans: state.loans,
+        subscriptions: state.subscriptions,
         appLockEnabled: state.appLockEnabled,
+        weeklySummaryEnabled: state.weeklySummaryEnabled,
+        weeklySummaryWeekday: state.weeklySummaryWeekday,
+        weeklySummaryHour: state.weeklySummaryHour,
+        weeklySummaryMinute: state.weeklySummaryMinute,
+        notificationLog: state.notificationLog,
       }),
       merge: (persisted, current) => {
         const p = persisted as Partial<AppState> | undefined;
@@ -534,6 +772,15 @@ export const useAppStore = create<AppState>()(
             typeof p?.hasCompletedOnboarding === 'boolean'
               ? p.hasCompletedOnboarding
               : current.hasCompletedOnboarding,
+          hasSeenNotificationPermissionPrompt: (() => {
+            if (typeof p?.hasSeenNotificationPermissionPrompt === 'boolean') {
+              return p.hasSeenNotificationPermissionPrompt;
+            }
+            if (p == null || Object.keys(p).length === 0) {
+              return false;
+            }
+            return true;
+          })(),
           appMode: p?.appMode !== undefined ? p.appMode : current.appMode,
           currency: ensureCurrency(p?.currency),
           categories: ensureCategories(p?.categories ?? current.categories),
@@ -569,10 +816,44 @@ export const useAppStore = create<AppState>()(
           savingsGoals: ensureSavingsGoals(p?.savingsGoals),
           recurringRules: ensureRecurringRules(p?.recurringRules),
           loans: ensureLoans(p?.loans),
+          subscriptions: ensureSubscriptions(p?.subscriptions),
           appLockEnabled:
             typeof p?.appLockEnabled === 'boolean'
               ? p.appLockEnabled
               : false,
+          weeklySummaryEnabled:
+            typeof p?.weeklySummaryEnabled === 'boolean'
+              ? p.weeklySummaryEnabled
+              : false,
+          weeklySummaryWeekday:
+            typeof p?.weeklySummaryWeekday === 'number' &&
+            p.weeklySummaryWeekday >= 1 &&
+            p.weeklySummaryWeekday <= 7
+              ? p.weeklySummaryWeekday
+              : 7,
+          weeklySummaryHour:
+            typeof p?.weeklySummaryHour === 'number' &&
+            p.weeklySummaryHour >= 0 &&
+            p.weeklySummaryHour <= 23
+              ? p.weeklySummaryHour
+              : 19,
+          weeklySummaryMinute:
+            typeof p?.weeklySummaryMinute === 'number' &&
+            p.weeklySummaryMinute >= 0 &&
+            p.weeklySummaryMinute <= 59
+              ? p.weeklySummaryMinute
+              : 0,
+          notificationLog: Array.isArray(p?.notificationLog)
+            ? (p.notificationLog as NotificationLogEntry[])
+                .filter(
+                  (x) =>
+                    x &&
+                    typeof x.id === 'string' &&
+                    typeof x.title === 'string' &&
+                    typeof x.receivedAt === 'string'
+                )
+                .slice(0, 64)
+            : current.notificationLog,
         };
       },
     }

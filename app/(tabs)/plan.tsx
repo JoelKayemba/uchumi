@@ -1,54 +1,73 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UchumiScreen } from '@/src/components/uchumi-screen';
-import { colors } from '@/src/theme';
+import { colors, TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
 
 const LINKS: {
-  href: '/plan/budgets' | '/plan/goals' | '/plan/recurring' | '/plan/loans' | '/plan/calendar';
+  href:
+    | '/plan/budgets'
+    | '/plan/goals'
+    | '/plan/recurring'
+    | '/plan/subscriptions'
+    | '/plan/loans'
+    | '/plan/calendar'
+    | '/stats'
+    | '/markets';
   title: string;
   sub: string;
   icon: keyof typeof Ionicons.glyphMap;
-  grad: readonly [string, string];
 }[] = [
   {
     href: '/plan/budgets',
     title: 'Budgets par catégorie',
     sub: 'Plafonds mensuels et suivi des dépenses',
     icon: 'pie-chart-outline',
-    grad: ['#4a6670', '#2f3d42'],
   },
   {
     href: '/plan/goals',
     title: 'Objectifs d’épargne',
     sub: 'Cagnottes et montants cibles',
     icon: 'flag-outline',
-    grad: ['#5c4a6b', '#352a40'],
   },
   {
     href: '/plan/recurring',
     title: 'Mouvements récurrents',
-    sub: 'Abonnements, loyers, rappels à valider',
+    sub: 'Modèles à appliquer quand c’est dû',
     icon: 'repeat-outline',
-    grad: ['#4a6b5a', '#263830'],
+  },
+  {
+    href: '/plan/subscriptions',
+    title: 'Abonnements & charges fixes',
+    sub: 'Montants, rappels, loyer, prélèvements — prévision budgétaire',
+    icon: 'albums-outline',
   },
   {
     href: '/plan/loans',
     title: 'Crédits & dettes',
     sub: 'Suivi manuel des mensualités et reste dû',
     icon: 'card-outline',
-    grad: ['#6b5a4a', '#3d3228'],
   },
   {
     href: '/plan/calendar',
     title: 'Calendrier',
     sub: 'Vue du mois et activité par jour',
     icon: 'calendar-outline',
-    grad: ['#3d4f5c', '#2a3038'],
+  },
+  {
+    href: '/stats',
+    title: 'Statistiques',
+    sub: 'Graphiques et synthèses',
+    icon: 'bar-chart-outline',
+  },
+  {
+    href: '/markets',
+    title: 'Marchés',
+    sub: 'Cours et vigie',
+    icon: 'trending-up-outline',
   },
 ];
 
@@ -61,41 +80,33 @@ export default function PlanTabScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: insets.bottom + 88 },
+          { paddingBottom: insets.bottom + TAB_BAR_FLOAT_BOTTOM_OFFSET },
         ]}
         showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['#2d3540', '#1a1e24']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}>
+        <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Ionicons name="clipboard" size={28} color={colors.textPrimary} />
+            <Ionicons name="clipboard" size={28} color={colors.ink} />
           </View>
           <Text style={styles.title}>Plan financier</Text>
           <Text style={styles.sub}>
             Tout est stocké sur cet appareil : budgets, objectifs, récurrence et crédits — sans
             serveur.
           </Text>
-        </LinearGradient>
+        </View>
 
         {LINKS.map((item) => (
           <Pressable
             key={item.href}
             onPress={() => router.push(item.href)}
-            style={({ pressed }) => [pressed && styles.pressed]}>
-            <LinearGradient
-              colors={[...item.grad]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.card}>
-              <Ionicons name={item.icon} size={26} color={colors.textPrimary} />
-              <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardSub}>{item.sub}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.accent} />
-            </LinearGradient>
+            style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+            <View style={styles.cardIcon}>
+              <Ionicons name={item.icon} size={26} color={colors.accent} />
+            </View>
+            <View style={styles.cardText}>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.cardSub}>{item.sub}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </Pressable>
         ))}
       </ScrollView>
@@ -110,20 +121,31 @@ const styles = StyleSheet.create({
   },
   scroll: {
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
   },
   hero: {
     borderRadius: 22,
     padding: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.dune,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.fuscousGray,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   heroIcon: {
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
@@ -138,7 +160,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     lineHeight: 21,
-    color: 'rgba(244,241,238,0.65)',
+    color: colors.textSecondary,
   },
   card: {
     flexDirection: 'row',
@@ -146,9 +168,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
     borderRadius: 18,
+    backgroundColor: colors.dune,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    marginBottom: spacing.sm,
+    borderColor: colors.fuscousGray,
+  },
+  cardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(46,204,113,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardText: {
     flex: 1,
@@ -160,7 +190,7 @@ const styles = StyleSheet.create({
   },
   cardSub: {
     fontSize: 12,
-    color: 'rgba(244,241,238,0.7)',
+    color: colors.textMuted,
     marginTop: 4,
     lineHeight: 17,
   },

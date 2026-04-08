@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +12,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  SilkyModalize,
+  type ModalizeRef,
+} from '@/src/components/silky-modalize';
+import { ScreenHeader } from '@/src/components/screen-header';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
@@ -26,7 +30,7 @@ export default function LoansScreen() {
   const addLoan = useAppStore((s) => s.addLoan);
   const updateLoan = useAppStore((s) => s.updateLoan);
   const deleteLoan = useAppStore((s) => s.deleteLoan);
-  const [open, setOpen] = useState(false);
+  const loanModalRef = useRef<ModalizeRef>(null);
   const [name, setName] = useState('');
   const [remaining, setRemaining] = useState('');
   const [monthly, setMonthly] = useState('');
@@ -47,11 +51,12 @@ export default function LoansScreen() {
     setName('');
     setRemaining('');
     setMonthly('');
-    setOpen(false);
+    loanModalRef.current?.close();
   };
 
   return (
     <UchumiScreen style={styles.wrap}>
+      <ScreenHeader title="Crédits" />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -61,7 +66,7 @@ export default function LoansScreen() {
           Suivi manuel (hors banque connectée). Mettez à jour le reste dû quand vous voulez.
         </Text>
         <Pressable
-          onPress={() => setOpen(true)}
+          onPress={() => loanModalRef.current?.open()}
           style={({ pressed }) => [styles.add, pressed && styles.pressed]}>
           <Ionicons name="add" size={22} color={colors.textPrimary} />
           <Text style={styles.addText}>Ajouter un crédit</Text>
@@ -104,51 +109,56 @@ export default function LoansScreen() {
         ))}
       </ScrollView>
 
-      <Modal visible={open} transparent animationType="fade">
-        <Pressable style={styles.modalBg} onPress={() => setOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Nouveau crédit</Text>
-            <TextInput
-              style={styles.in}
-              placeholder="Nom"
-              placeholderTextColor={colors.textMuted}
-              value={name}
-              onChangeText={setName}
-            />
-            <TextInput
-              style={styles.in}
-              placeholder="Reste dû"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="decimal-pad"
-              value={remaining}
-              onChangeText={setRemaining}
-            />
-            <TextInput
-              style={styles.in}
-              placeholder="Mensualité"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="decimal-pad"
-              value={monthly}
-              onChangeText={setMonthly}
-            />
-            <View style={styles.modalRow}>
-              <Pressable onPress={() => setOpen(false)}>
-                <Text style={styles.cancel}>Annuler</Text>
-              </Pressable>
-              <Pressable onPress={submit}>
-                <Text style={styles.ok}>Ajouter</Text>
-              </Pressable>
-            </View>
+      <SilkyModalize
+        ref={loanModalRef}
+        adjustToContentHeight
+        childrenStyle={{ gap: spacing.sm }}
+        onClosed={() => {
+          setName('');
+          setRemaining('');
+          setMonthly('');
+        }}
+        scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}>
+        <Text style={styles.modalTitle}>Nouveau crédit</Text>
+        <TextInput
+          style={styles.in}
+          placeholder="Nom"
+          placeholderTextColor={colors.textMuted}
+          value={name}
+          onChangeText={setName}
+        />
+        <TextInput
+          style={styles.in}
+          placeholder="Reste dû"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="decimal-pad"
+          value={remaining}
+          onChangeText={setRemaining}
+        />
+        <TextInput
+          style={styles.in}
+          placeholder="Mensualité"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="decimal-pad"
+          value={monthly}
+          onChangeText={setMonthly}
+        />
+        <View style={styles.modalRow}>
+          <Pressable onPress={() => loanModalRef.current?.close()}>
+            <Text style={styles.cancel}>Annuler</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+          <Pressable onPress={submit}>
+            <Text style={styles.ok}>Ajouter</Text>
+          </Pressable>
+        </View>
+      </SilkyModalize>
     </UchumiScreen>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, paddingTop: spacing.sm },
-  scroll: { paddingHorizontal: spacing.md, gap: spacing.md },
+  scroll: { gap: spacing.md },
   intro: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   add: {
     flexDirection: 'row',
@@ -182,18 +192,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   del: { color: colors.danger, fontWeight: '600' },
-  modalBg: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: colors.dune,
-    borderRadius: 18,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
   modalTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
   modalRow: {
     flexDirection: 'row',

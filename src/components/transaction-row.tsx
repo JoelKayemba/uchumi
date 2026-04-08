@@ -6,7 +6,9 @@ import { currencyOptionToIso } from '@/src/constants/currencies';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
 import { formatCurrencyIso } from '@/src/lib/format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
+import { finShell } from '@/src/theme/fin-shell';
 import { colors } from '@/src/theme';
+import { spacing } from '@/src/theme/spacing';
 import type { Transaction } from '@/src/types/transaction';
 
 dayjs.locale('fr');
@@ -121,25 +123,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.fuscousGray,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: finShell.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: finShell.border,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.9,
   },
   left: {
     flex: 1,
     marginRight: 12,
   },
   label: {
-    color: colors.textPrimary,
+    color: finShell.ink,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   meta: {
-    color: colors.textMuted,
+    color: finShell.muted,
     fontSize: 12,
     marginTop: 4,
   },

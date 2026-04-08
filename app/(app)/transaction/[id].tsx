@@ -1,7 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { currencyOptionToIso } from '@/src/constants/currencies';
+import { ScreenHeader } from '@/src/components/screen-header';
 import { TransactionForm } from '@/src/components/transaction-form';
 import { getExchangeRate } from '@/src/services/exchange-rates';
 import { useAppStore } from '@/src/store/use-app-store';
@@ -17,15 +19,21 @@ export default function EditTransactionScreen() {
 
   if (!transaction) {
     return (
-      <View style={styles.missing}>
-        <Text style={styles.missingText}>Mouvement introuvable.</Text>
-      </View>
+      <SafeAreaView style={styles.missingSafe} edges={['top', 'left', 'right']}>
+        <View style={styles.missingHeaderPad}>
+          <ScreenHeader title="Modifier" onBack={() => router.back()} />
+        </View>
+        <View style={styles.missing}>
+          <Text style={styles.missingText}>Mouvement introuvable.</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
     <TransactionForm
       key={transaction.id}
+      headerTitle="Modifier"
       submitLabel="Enregistrer les modifications"
       initialKind={transaction.kind}
       initialAmount={transaction.amount}
@@ -65,11 +73,17 @@ export default function EditTransactionScreen() {
 }
 
 const styles = StyleSheet.create({
+  missingSafe: {
+    flex: 1,
+    backgroundColor: colors.marshland,
+  },
+  missingHeaderPad: {
+    paddingHorizontal: spacing.md,
+  },
   missing: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.marshland,
     padding: spacing.lg,
   },
   missingText: {

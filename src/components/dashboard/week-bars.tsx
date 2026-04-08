@@ -8,12 +8,58 @@ import { spacing } from '@/src/theme/spacing';
 type WeekBarsProps = {
   bars: DayBar[];
   title: string;
+  /** Style « dashboard » : barres vert citron, % sur la semaine. */
+  variant?: 'default' | 'home';
 };
 
 const BAR_MAX_H = 64;
+const BAR_MAX_H_HOME = 72;
 
-export function WeekBars({ bars, title }: WeekBarsProps) {
+export function WeekBars({ bars, title, variant = 'default' }: WeekBarsProps) {
   const max = maxBarValue(bars);
+  const weekOutTotal = bars.reduce((s, b) => s + b.outflow, 0);
+
+  if (variant === 'home') {
+    const maxOut = Math.max(1, ...bars.map((b) => b.outflow));
+    return (
+      <View style={styles.block}>
+        <Text style={styles.title}>{title}</Text>
+        <View style={styles.row}>
+          {bars.map((b, i) => {
+            const hOut =
+              maxOut > 0 ? (b.outflow / maxOut) * BAR_MAX_H_HOME : 0;
+            const pct =
+              weekOutTotal > 0
+                ? Math.round((b.outflow / weekOutTotal) * 100)
+                : 0;
+            const isPeak = b.outflow > 0 && b.outflow === maxOut;
+            return (
+              <View key={i} style={styles.day}>
+                <Text style={styles.pctLabel}>{pct}%</Text>
+                <View style={styles.homeTrack}>
+                  <View
+                    style={[
+                      styles.homeBar,
+                      {
+                        height:
+                          hOut <= 0
+                            ? 0
+                            : Math.max(4, Math.min(BAR_MAX_H_HOME - 2, hOut)),
+                        backgroundColor: isPeak ? colors.limeDark : colors.lime,
+                        opacity: b.outflow <= 0 ? 0.35 : 1,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.dayLabel}>{b.label}</Text>
+              </View>
+            );
+          })}
+        </View>
+        <Text style={styles.homeHint}>Sorties par jour · % du total hebdo</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.block}>
@@ -142,5 +188,32 @@ const styles = StyleSheet.create({
   hintText: {
     fontSize: 11,
     color: colors.textMuted,
+  },
+  pctLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textMuted,
+    fontVariant: ['tabular-nums'],
+    marginBottom: 4,
+  },
+  homeTrack: {
+    width: '100%',
+    height: BAR_MAX_H_HOME,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    overflow: 'hidden',
+    paddingBottom: 2,
+  },
+  homeBar: {
+    width: '78%',
+    borderRadius: 8,
+    minHeight: 2,
+  },
+  homeHint: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
 });

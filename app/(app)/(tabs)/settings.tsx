@@ -1,12 +1,11 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -14,25 +13,52 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdBannerSlot } from '@/src/components/ad-banner-slot';
+import {
+  SilkyModalize,
+  type ModalizeRef,
+} from '@/src/components/silky-modalize';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import {
-  CURRENCY_OPTIONS,
+  currencyOptionIcon,
+  currencyOptionLabel,
+  groupCurrenciesForSettings,
+  getSortedCurrencyOptions,
   type CurrencyOptionId,
 } from '@/src/constants/currencies';
 import { exportUchumiCsv } from '@/src/services/export-csv';
 import { exportUchumiData } from '@/src/services/export-data';
 import { pickAndImportUchumiJson } from '@/src/services/import-data';
+import {
+  getNotificationAuthStatus,
+  openAppSettingsForNotifications,
+  requestNotificationPermissions,
+  type NotificationAuthStatus,
+} from '@/src/services/notification-permissions';
+import {
+  syncReminderFromStore,
+} from '@/src/services/reminder-notifications';
+import { syncSubscriptionNotificationsFromStore } from '@/src/services/subscription-sync';
+import { syncWeeklySummaryFromStore } from '@/src/services/weekly-summary-notifications';
 import { useAppStore } from '@/src/store/use-app-store';
-import { colors } from '@/src/theme';
+import { colors, TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
+
+function titleFromCurrencyLabel(label: string): string {
+  const i = label.indexOf(' — ');
+  return i >= 0 ? label.slice(0, i) : label;
+}
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const currencyModalRef = useRef<ModalizeRef>(null);
+  const timeModalRef = useRef<ModalizeRef>(null);
   const router = useRouter();
   const appMode = useAppStore((s) => s.appMode);
   const currency = useAppStore((s) => s.currency);
@@ -45,10 +71,20 @@ export default function SettingsScreen() {
   const lowBalanceEnabled = useAppStore((s) => s.lowBalanceEnabled);
   const lowBalanceThreshold = useAppStore((s) => s.lowBalanceThreshold);
   const setLowBalancePreferences = useAppStore((s) => s.setLowBalancePreferences);
-  const appLockEnabled = useAppStore((s) => s.appLockEnabled);
-  const setAppLockEnabled = useAppStore((s) => s.setAppLockEnabled);
+  const weeklySummaryEnabled = useAppStore((s) => s.weeklySummaryEnabled);
+  const setWeeklySummaryPreferences = useAppStore(
+    (s) => s.setWeeklySummaryPreferences
+  );
+  const clearTransactions = useAppStore((s) => s.clearTransactions);
+  const clearCategoryBudgets = useAppStore((s) => s.clearCategoryBudgets);
+  const clearSavingsGoals = useAppStore((s) => s.clearSavingsGoals);
+  const clearRecurringRules = useAppStore((s) => s.clearRecurringRules);
+  const clearLoans = useAppStore((s) => s.clearLoans);
+  const clearSubscriptions = useAppStore((s) => s.clearSubscriptions);
+  const clearMarketWatchlist = useAppStore((s) => s.clearMarketWatchlist);
+  const clearNotificationLog = useAppStore((s) => s.clearNotificationLog);
+  const purgeAllFinancialData = useAppStore((s) => s.purgeAllFinancialData);
 
-  const [currencyModal, setCurrencyModal] = useState(false);
   const [thresholdDraft, setThresholdDraft] = useState(
     () => (lowBalanceThreshold != null ? String(lowBalanceThreshold) : '')
   );
@@ -62,9 +98,47 @@ export default function SettingsScreen() {
   const [exportingCsv, setExportingCsv] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [currencyQuery, setCurrencyQuery] = useState('');
+  const [notifAuth, setNotifAuth] = useState<NotificationAuthStatus | null>(null);
 
-  const currencyLabel =
-    CURRENCY_OPTIONS.find((o) => o.id === currency)?.label ?? '';
+  const refreshNotifAuth = useCallback(() => {
+    void getNotificationAuthStatus().then(setNotifAuth);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'web') {
+        setNotifAuth(null);
+        return;
+      }
+      refreshNotifAuth();
+    }, [refreshNotifAuth])
+  );
+
+  const currencyLabel = currencyOptionLabel(currency);
+  const currencyEmoji = currencyOptionIcon(currency);
+
+  const currencySections = useMemo(() => {
+    const sorted = getSortedCurrencyOptions();
+    const q = currencyQuery.trim().toLowerCase();
+    const stripAccents = (s: string) =>
+      s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const needle = stripAccents(q);
+    const filtered = !needle
+      ? [...sorted]
+      : sorted.filter((o) => {
+          const label = stripAccents(o.label.toLowerCase());
+          return (
+            label.includes(needle) ||
+            o.iso4217.toLowerCase().includes(q) ||
+            o.id.toLowerCase().includes(q)
+          );
+        });
+    if (!needle) {
+      return groupCurrenciesForSettings(filtered);
+    }
+    return [{ title: 'Résultats', items: filtered }];
+  }, [currencyQuery]);
 
   const timeLabel = useMemo(
     () =>
@@ -112,7 +186,8 @@ export default function SettingsScreen() {
 
   const pickCurrency = (id: CurrencyOptionId) => {
     setCurrency(id);
-    setCurrencyModal(false);
+    setCurrencyQuery('');
+    currencyModalRef.current?.close();
   };
 
   const onTimeChange = (_e: unknown, date?: Date) => {
@@ -129,23 +204,77 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingBottom: insets.bottom + 88 },
+          { paddingBottom: insets.bottom + TAB_BAR_FLOAT_BOTTOM_OFFSET },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['#353a42', '#22262c']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}>
+        <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Ionicons name="options" size={28} color={colors.textPrimary} />
+            <Ionicons name="options" size={28} color={colors.ink} />
           </View>
           <Text style={styles.title}>Réglages</Text>
           <Text style={styles.heroSub}>
             Devise, rappels, alertes, export / import et onboarding.
           </Text>
-        </LinearGradient>
+        </View>
+
+        {Platform.OS !== 'web' ? (
+          <View style={styles.notifBlock}>
+            <Text style={styles.notifTitle}>Notifications système</Text>
+            <Text style={styles.notifSub}>
+              Les rappels et alertes UCHUMI sont des notifications locales : elles peuvent
+              s’afficher même quand l’app est fermée (aucun serveur, pas de compte).
+            </Text>
+            <Text style={styles.notifStatus}>
+              État :{' '}
+              <Text style={styles.notifStatusEm}>
+                {notifAuth === null
+                  ? '…'
+                  : notifAuth === 'granted'
+                    ? 'Autorisées'
+                    : notifAuth === 'denied'
+                      ? 'Refusées'
+                      : 'Pas encore demandées'}
+              </Text>
+            </Text>
+            <View style={styles.notifActions}>
+              {notifAuth !== 'granted' ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.notifBtnPrimary,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={async () => {
+                    const s = await requestNotificationPermissions();
+                    setNotifAuth(s);
+                    if (s === 'granted') {
+                      await syncReminderFromStore();
+                      await syncWeeklySummaryFromStore();
+                      await syncSubscriptionNotificationsFromStore();
+                    }
+                  }}>
+                  <Text style={styles.notifBtnPrimaryText}>
+                    {notifAuth === 'denied'
+                      ? 'Redemander l’autorisation'
+                      : 'Autoriser les notifications'}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {notifAuth === 'denied' ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.notifBtnSecondary,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => void openAppSettingsForNotifications()}>
+                  <Text style={styles.notifBtnSecondaryText}>
+                    Ouvrir les réglages du téléphone
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.row}>
           <Text style={styles.label}>Mode actuel</Text>
@@ -154,10 +283,13 @@ export default function SettingsScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.row, styles.rowPress, pressed && styles.pressed]}
-          onPress={() => setCurrencyModal(true)}>
+          onPress={() => {
+            setCurrencyQuery('');
+            currencyModalRef.current?.open();
+          }}>
           <Text style={styles.label}>Devise d’affichage</Text>
           <Text style={styles.valueChevron} numberOfLines={2}>
-            {currencyLabel} ›
+            {currencyEmoji} {currencyLabel} ›
           </Text>
         </Pressable>
 
@@ -180,11 +312,36 @@ export default function SettingsScreen() {
           {reminderEnabled ? (
             <Pressable
               style={({ pressed }) => [styles.timeBtn, pressed && styles.pressed]}
-              onPress={() => setShowTimePicker(true)}>
+              onPress={() => {
+                if (Platform.OS === 'android') {
+                  setShowTimePicker(true);
+                } else {
+                  timeModalRef.current?.open();
+                }
+              }}>
               <Text style={styles.timeBtnLabel}>Heure : {timeLabel}</Text>
               <Text style={styles.timeBtnHint}>Toucher pour modifier</Text>
             </Pressable>
           ) : null}
+        </View>
+
+        <View style={styles.reminderBlock}>
+          <View style={styles.reminderRow}>
+            <View style={styles.reminderTextCol}>
+              <Text style={styles.reminderTitle}>Résumé de fin de semaine</Text>
+              <Text style={styles.reminderSub}>
+                Chaque samedi à 19 h : rappel pour ouvrir UCHUMI et voir le résumé des dépenses
+                (calcul sur l’appareil, sans serveur). Le texte de la notification est fixe ; le détail
+                est sur l’accueil.
+              </Text>
+            </View>
+            <Switch
+              value={weeklySummaryEnabled}
+              onValueChange={(v) => setWeeklySummaryPreferences(v, 7, 19, 0)}
+              trackColor={{ false: colors.fuscousGray, true: colors.accent }}
+              thumbColor={colors.textPrimary}
+            />
+          </View>
         </View>
 
         <View style={styles.reminderBlock}>
@@ -234,24 +391,6 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <View style={styles.reminderBlock}>
-          <View style={styles.reminderRow}>
-            <View style={styles.reminderTextCol}>
-              <Text style={styles.reminderTitle}>Verrouillage à l’ouverture</Text>
-              <Text style={styles.reminderSub}>
-                Après retour depuis une autre app ou l’écran verrouillé, authentification locale
-                (code, Face ID ou empreinte) pour revenir à UCHUMI.
-              </Text>
-            </View>
-            <Switch
-              value={appLockEnabled}
-              onValueChange={setAppLockEnabled}
-              trackColor={{ false: colors.fuscousGray, true: colors.accent }}
-              thumbColor={colors.textPrimary}
-            />
-          </View>
-        </View>
-
         {showTimePicker && Platform.OS === 'android' ? (
           <DateTimePicker
             value={reminderDate}
@@ -261,36 +400,153 @@ export default function SettingsScreen() {
           />
         ) : null}
 
-        {showTimePicker && Platform.OS === 'ios' ? (
-          <Modal
-            visible
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowTimePicker(false)}>
-            <View style={styles.timeModalOverlay}>
-              <View style={styles.timeModalCard}>
-                <DateTimePicker
-                  value={reminderDate}
-                  mode="time"
-                  display="spinner"
-                  onChange={onTimeChange}
-                  themeVariant="dark"
-                />
-                <Pressable
-                  style={styles.timeModalOk}
-                  onPress={() => setShowTimePicker(false)}>
-                  <Text style={styles.timeModalOkText}>OK</Text>
-                </Pressable>
-              </View>
-            </View>
-          </Modal>
-        ) : null}
-
         <Pressable
           style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
           onPress={() => router.push('/categories')}>
           <Text style={styles.linkLabel}>Gérer les catégories</Text>
         </Pressable>
+
+        <Text style={styles.sectionLabel}>Aide & confidentialité</Text>
+        <Pressable
+          style={({ pressed }) => [styles.row, styles.rowPress, pressed && styles.pressed]}
+          onPress={() => router.push('/notifications')}>
+          <Text style={styles.label}>Centre de notifications</Text>
+          <Text style={styles.valueChevron}>Voir ›</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.row, styles.rowPress, pressed && styles.pressed]}
+          onPress={() => router.push('/support')}>
+          <Text style={styles.label}>FAQ & support</Text>
+          <Text style={styles.valueChevron}>›</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.row, styles.rowPress, pressed && styles.pressed]}
+          onPress={() => router.push('/privacy')}>
+          <Text style={styles.label}>Politique de confidentialité</Text>
+          <Text style={styles.valueChevron}>›</Text>
+        </Pressable>
+
+        <View style={styles.dataBlock}>
+          <Text style={styles.reminderTitle}>Données locales (libérer l’espace)</Text>
+          <Text style={styles.reminderSub}>
+            Tout reste sur cet appareil. Supprimez ce que vous n’utilisez plus — devise et rappels ne
+            sont pas effacés sauf réinitialisation complète listée en bas.
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert(
+                'Supprimer tous les mouvements ?',
+                'Les soldes et statistiques seront recalculés à partir de zéro.',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  {
+                    text: 'Supprimer',
+                    style: 'destructive',
+                    onPress: () => clearTransactions(),
+                  },
+                ]
+              )
+            }>
+            <Text style={styles.dataBtnLabel}>Supprimer tous les mouvements</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert(
+                'Réinitialiser les budgets par catégorie ?',
+                '',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'OK', onPress: () => clearCategoryBudgets() },
+                ]
+              )
+            }>
+            <Text style={styles.dataBtnLabel}>Effacer les plafonds de budget</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert('Supprimer tous les objectifs d’épargne ?', '', [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Supprimer', style: 'destructive', onPress: () => clearSavingsGoals() },
+              ])
+            }>
+            <Text style={styles.dataBtnLabel}>Supprimer les objectifs</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert('Supprimer toutes les récurrences ?', '', [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Supprimer', style: 'destructive', onPress: () => clearRecurringRules() },
+              ])
+            }>
+            <Text style={styles.dataBtnLabel}>Supprimer les récurrences</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert('Supprimer tous les prêts ?', '', [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Supprimer', style: 'destructive', onPress: () => clearLoans() },
+              ])
+            }>
+            <Text style={styles.dataBtnLabel}>Supprimer les prêts</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert('Supprimer tous les abonnements ?', '', [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Supprimer', style: 'destructive', onPress: () => clearSubscriptions() },
+              ])
+            }>
+            <Text style={styles.dataBtnLabel}>Supprimer les abonnements</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert(
+                'Réinitialiser la liste marché (AAPL, MSFT par défaut) ?',
+                '',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'OK', onPress: () => clearMarketWatchlist() },
+                ]
+              )
+            }>
+            <Text style={styles.dataBtnLabel}>Réinitialiser la liste marché</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert('Effacer le journal des notifications ?', '', [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'OK', onPress: () => clearNotificationLog() },
+              ])
+            }>
+            <Text style={styles.dataBtnLabel}>Effacer le journal des notifications</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dataBtnDanger, pressed && styles.pressed]}
+            onPress={() =>
+              Alert.alert(
+                'Tout réinitialiser ?',
+                'Mouvements, catégories par défaut, budgets, objectifs, récurrences, prêts, abonnements, liste marché et journal de notifications seront effacés. Vos réglages (devise, rappels) sont conservés.',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  {
+                    text: 'Tout effacer',
+                    style: 'destructive',
+                    onPress: () => purgeAllFinancialData(),
+                  },
+                ]
+              )
+            }>
+            <Text style={styles.dataBtnDangerLabel}>Réinitialiser toutes les données financières</Text>
+          </Pressable>
+        </View>
 
         <Text style={styles.sectionLabel}>Sauvegarde</Text>
         <Pressable
@@ -355,45 +611,109 @@ export default function SettingsScreen() {
           <Text style={styles.linkLabel}>Revoir l’introduction (onboarding)</Text>
         </Pressable>
 
-        <AdBannerSlot />
+        <AdBannerSlot placeholderDetail="Réglages — emplacement réservé (AdMob en build natif)." />
       </ScrollView>
 
-      <Modal
-        visible={currencyModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCurrencyModal(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setCurrencyModal(false)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Devise d’affichage</Text>
-            <Text style={styles.modalSub}>
-              Utilisée pour formater les montants dans l’app (symbole ou code ISO).
-            </Text>
-            {CURRENCY_OPTIONS.map((opt) => (
-              <Pressable
-                key={opt.id}
-                onPress={() => pickCurrency(opt.id)}
-                style={[
-                  styles.currencyRow,
-                  currency === opt.id && styles.currencyRowActive,
-                ]}>
-                <Text
+      <SilkyModalize
+        ref={currencyModalRef}
+        modalHeight={Math.round(windowHeight * 0.55)}
+        scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}>
+        <Text style={styles.modalTitle}>Devise d’affichage</Text>
+        <Text style={styles.modalSub}>
+          Tous les montants de l’interface utilisent cette devise (symbole ou code ISO).
+        </Text>
+        <View style={styles.currencySearchWrap}>
+          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.currencySearchInput}
+            placeholder="Rechercher (nom, code ISO…)"
+            placeholderTextColor={colors.textMuted}
+            value={currencyQuery}
+            onChangeText={setCurrencyQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+        </View>
+        {currencySections.every((s) => s.items.length === 0) ? (
+          <Text style={styles.currencyEmpty}>
+            Aucune devise ne correspond à « {currencyQuery.trim()} ». Essayez un autre mot ou un
+            code ISO (ex. CAD, EUR).
+          </Text>
+        ) : null}
+        {currencySections.map((section) => (
+          <View key={section.title} style={styles.currencySection}>
+            {section.items.length > 0 ? (
+              <Text style={styles.currencySectionTitle}>{section.title}</Text>
+            ) : null}
+            {section.items.map((opt) => {
+              const selected = currency === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => pickCurrency(opt.id)}
                   style={[
-                    styles.currencyText,
-                    currency === opt.id && styles.currencyTextActive,
+                    styles.currencyRow,
+                    selected && styles.currencyRowActive,
                   ]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
-            ))}
-            <Pressable
-              onPress={() => setCurrencyModal(false)}
-              style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}>
-              <Text style={styles.modalCloseText}>Fermer</Text>
-            </Pressable>
-          </Pressable>
+                  <Text style={styles.currencyIconEmoji}>{opt.icon}</Text>
+                  <View style={styles.currencyRowTextCol}>
+                    <Text
+                      style={[
+                        styles.currencyPrimary,
+                        selected && styles.currencyTextActive,
+                      ]}
+                      numberOfLines={2}>
+                      {titleFromCurrencyLabel(opt.label)}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.currencyIsoBadge,
+                      selected && styles.currencyIsoBadgeActive,
+                    ]}>
+                    {opt.iso4217}
+                  </Text>
+                  {selected ? (
+                    <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+                  ) : (
+                    <View style={styles.currencyCheckPlaceholder} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
+        <Pressable
+          onPress={() => {
+            setCurrencyQuery('');
+            currencyModalRef.current?.close();
+          }}
+          style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}>
+          <Text style={styles.modalCloseText}>Fermer</Text>
         </Pressable>
-      </Modal>
+      </SilkyModalize>
+
+      {Platform.OS === 'ios' ? (
+        <SilkyModalize
+          ref={timeModalRef}
+          adjustToContentHeight
+          scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}>
+          <Text style={styles.timeModalSheetTitle}>Heure du rappel</Text>
+          <DateTimePicker
+            value={reminderDate}
+            mode="time"
+            display="spinner"
+            onChange={onTimeChange}
+            themeVariant="dark"
+          />
+          <Pressable
+            style={styles.timeModalOk}
+            onPress={() => timeModalRef.current?.close()}>
+            <Text style={styles.timeModalOkText}>OK</Text>
+          </Pressable>
+        </SilkyModalize>
+      ) : null}
     </UchumiScreen>
   );
 }
@@ -412,13 +732,25 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.fuscousGray,
+    backgroundColor: colors.dune,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   heroIcon: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
@@ -426,8 +758,66 @@ const styles = StyleSheet.create({
   heroSub: {
     fontSize: 14,
     lineHeight: 20,
-    color: 'rgba(244,241,238,0.65)',
+    color: colors.textSecondary,
     marginTop: 6,
+  },
+  notifBlock: {
+    backgroundColor: colors.dune,
+    borderRadius: 16,
+    padding: spacing.md + 4,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  notifTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  notifSub: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textMuted,
+  },
+  notifStatus: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  notifStatusEm: {
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  notifActions: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  notifBtnPrimary: {
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  notifBtnPrimaryText: {
+    color: colors.textOnDark,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  notifBtnSecondary: {
+    backgroundColor: colors.marshland,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+  },
+  notifBtnSecondaryText: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   title: {
     fontSize: 24,
@@ -528,18 +918,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: Platform.OS === 'ios' ? 12 : 8,
   },
-  timeModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: spacing.lg,
-  },
-  timeModalCard: {
-    backgroundColor: colors.dune,
-    borderRadius: 16,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.fuscousGray,
+  timeModalSheetTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   timeModalOk: {
     alignItems: 'center',
@@ -561,6 +945,43 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 15,
     textDecorationLine: 'underline',
+  },
+  dataBlock: {
+    backgroundColor: colors.dune,
+    borderRadius: 16,
+    padding: spacing.md + 4,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  dataBtn: {
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    backgroundColor: colors.marshland,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+  },
+  dataBtnLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  dataBtnDanger: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    backgroundColor: 'rgba(232, 93, 76, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 93, 76, 0.35)',
+    marginTop: spacing.sm,
+  },
+  dataBtnDangerLabel: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.danger,
+    textAlign: 'center',
   },
   exportBtn: {
     backgroundColor: colors.dune,
@@ -585,20 +1006,6 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: -spacing.xs,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: colors.dune,
-    borderRadius: 16,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.fuscousGray,
-    maxHeight: '80%',
-  },
   modalTitle: {
     color: colors.textPrimary,
     fontSize: 18,
@@ -611,25 +1018,95 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: spacing.md,
   },
+  currencySearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+    backgroundColor: colors.marshland,
+  },
+  currencySearchInput: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: 16,
+    paddingVertical: 4,
+  },
+  currencyEmpty: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  currencySection: {
+    marginBottom: spacing.md,
+  },
+  currencySectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  currencyIconEmoji: {
+    fontSize: 28,
+    lineHeight: 34,
+    marginRight: 2,
+  },
   currencyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: spacing.xs,
     borderWidth: 1,
     borderColor: 'transparent',
+    backgroundColor: 'transparent',
   },
   currencyRowActive: {
     backgroundColor: colors.fuscousGray,
     borderColor: colors.accent,
   },
-  currencyText: {
+  currencyRowTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  currencyPrimary: {
     color: colors.textSecondary,
-    fontSize: 15,
+    fontSize: 16,
+    lineHeight: 22,
   },
   currencyTextActive: {
     color: colors.textPrimary,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  currencyIsoBadge: {
+    fontSize: 13,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+    color: colors.textMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: colors.marshland,
+    overflow: 'hidden',
+  },
+  currencyIsoBadgeActive: {
+    color: colors.accent,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+  },
+  currencyCheckPlaceholder: {
+    width: 22,
+    height: 22,
   },
   modalClose: {
     marginTop: spacing.md,

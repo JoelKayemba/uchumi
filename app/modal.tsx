@@ -7,24 +7,36 @@ import { colors } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
 
 /**
- * Modal exemple (Expo Router). Peut servir d’aide ou d’info rapide.
+ * Raccourci utile : aide, confidentialité, retour accueil.
  */
 export default function ModalScreen() {
   return (
     <UchumiScreen style={styles.wrap}>
       <View style={styles.card}>
         <View style={styles.iconWrap}>
-          <Ionicons name="information-circle" size={40} color={colors.accent} />
+          <Ionicons name="help-circle" size={40} color={colors.accent} />
         </View>
-        <Text style={styles.title}>UCHUMI</Text>
+        <Text style={styles.title}>Aide rapide</Text>
         <Text style={styles.body}>
-          Cette fenêtre est un modal de démonstration. Vous pouvez la remplacer par une aide
-          contextuelle, un résumé ou un rappel.
+          UCHUMI est une app locale : exportez vos données depuis les Réglages avant toute
+          réinitialisation importante.
         </Text>
-        <Link href="/(app)/(tabs)" dismissTo asChild>
+        <Link href="/(app)/support" asChild>
           <Pressable style={({ pressed }) => [styles.btn, pressed && styles.pressed]}>
-            <Text style={styles.btnLabel}>Retour à l’accueil</Text>
-            <Ionicons name="home" size={18} color={colors.textPrimary} />
+            <Text style={styles.btnLabel}>FAQ & support</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textPrimary} />
+          </Pressable>
+        </Link>
+        <Link href="/(app)/privacy" asChild>
+          <Pressable style={({ pressed }) => [styles.btn, pressed && styles.pressed]}>
+            <Text style={styles.btnLabel}>Confidentialité</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textPrimary} />
+          </Pressable>
+        </Link>
+        <Link href="/(app)/(tabs)" dismissTo asChild>
+          <Pressable style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressed]}>
+            <Text style={styles.btnPrimaryLabel}>Retour à l’accueil</Text>
+            <Ionicons name="home" size={18} color={colors.textOnDark} />
           </Pressable>
         </Link>
       </View>
@@ -45,32 +57,53 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.fuscousGray,
     gap: spacing.md,
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   iconWrap: {
+    alignSelf: 'center',
     marginBottom: spacing.xs,
   },
   title: {
     fontSize: 22,
     fontWeight: '800',
     color: colors.textPrimary,
-    letterSpacing: 2,
+    textAlign: 'center',
+    letterSpacing: -0.3,
   },
   body: {
     fontSize: 15,
     lineHeight: 22,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.sm,
-    marginTop: spacing.md,
-    backgroundColor: colors.fuscousGray,
+    backgroundColor: colors.marshland,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+  },
+  btnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
     borderRadius: 14,
+    marginTop: spacing.sm,
+  },
+  btnPrimaryLabel: {
+    color: colors.textOnDark,
+    fontSize: 16,
+    fontWeight: '800',
   },
   pressed: {
     opacity: 0.88,

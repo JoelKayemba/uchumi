@@ -6,7 +6,7 @@ import { useAppStore } from '@/src/store/use-app-store';
 
 function buildPayload(state: ReturnType<typeof useAppStore.getState>) {
   return {
-    exportVersion: 2,
+    exportVersion: 3,
     exportedAt: new Date().toISOString(),
     app: 'uchumi',
     appMode: state.appMode,
@@ -19,8 +19,13 @@ function buildPayload(state: ReturnType<typeof useAppStore.getState>) {
     savingsGoals: state.savingsGoals,
     recurringRules: state.recurringRules,
     loans: state.loans,
+    subscriptions: state.subscriptions,
     marketWatchlist: state.marketWatchlist,
     appLockEnabled: state.appLockEnabled,
+    weeklySummaryEnabled: state.weeklySummaryEnabled,
+    weeklySummaryWeekday: state.weeklySummaryWeekday,
+    weeklySummaryHour: state.weeklySummaryHour,
+    weeklySummaryMinute: state.weeklySummaryMinute,
   };
 }
 

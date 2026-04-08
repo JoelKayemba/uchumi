@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/src/components/screen-header';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
@@ -46,11 +47,8 @@ export default function CalendarScreen() {
 
   return (
     <UchumiScreen style={styles.wrap}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingBottom: insets.bottom + 24 },
-        ]}>
+      <ScreenHeader title="Calendrier" />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         <View style={styles.nav}>
           <Pressable onPress={() => setCursor((c) => c.subtract(1, 'month'))}>
             <Text style={styles.navBtn}>‹</Text>
@@ -63,8 +61,8 @@ export default function CalendarScreen() {
           </Pressable>
         </View>
         <View style={styles.weekRow}>
-          {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((d) => (
-            <Text key={d} style={styles.weekday}>
+          {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((d, i) => (
+            <Text key={`weekday-${i}`} style={styles.weekday}>
               {d}
             </Text>
           ))}
@@ -102,7 +100,6 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, paddingTop: spacing.sm },
-  scroll: { paddingHorizontal: spacing.md },
   nav: {
     flexDirection: 'row',
     alignItems: 'center',

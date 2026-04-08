@@ -1,19 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  SilkyModalize,
+  type ModalizeRef,
+} from '@/src/components/silky-modalize';
+import { ScreenHeader } from '@/src/components/screen-header';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
@@ -27,7 +31,7 @@ export default function GoalsScreen() {
   const addGoal = useAppStore((s) => s.addSavingsGoal);
   const updateGoal = useAppStore((s) => s.updateSavingsGoal);
   const deleteGoal = useAppStore((s) => s.deleteSavingsGoal);
-  const [open, setOpen] = useState(false);
+  const goalModalRef = useRef<ModalizeRef>(null);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [saved, setSaved] = useState('');
@@ -48,26 +52,28 @@ export default function GoalsScreen() {
     setName('');
     setTarget('');
     setSaved('');
-    setOpen(false);
+    goalModalRef.current?.close();
   };
 
   return (
     <UchumiScreen style={styles.wrap}>
+      <ScreenHeader title="Objectifs" />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
           { paddingBottom: insets.bottom + 24 },
         ]}>
-        <Pressable
-          onPress={() => setOpen(true)}
-          style={({ pressed }) => [styles.add, pressed && styles.pressed]}>
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={() => goalModalRef.current?.open()}
+          style={styles.addTouchable}>
           <LinearGradient
             colors={['#4a6670', '#354248']}
             style={styles.addGrad}>
-            <Ionicons name="add" size={22} color={colors.textPrimary} />
+            <Ionicons name="add" size={22} color={colors.textOnDark} />
             <Text style={styles.addText}>Nouvel objectif</Text>
           </LinearGradient>
-        </Pressable>
+        </TouchableOpacity>
 
         {goals.map((g) => {
           const ratio =
@@ -100,7 +106,9 @@ export default function GoalsScreen() {
                     }
                   }}
                 />
-                <Pressable
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   onPress={() =>
                     Alert.alert('Supprimer ?', '', [
                       { text: 'Annuler', style: 'cancel' },
@@ -110,77 +118,86 @@ export default function GoalsScreen() {
                         onPress: () => deleteGoal(g.id),
                       },
                     ])
-                  }>
+                  }
+                  style={styles.iconBtn}>
                   <Ionicons name="trash-outline" size={22} color={colors.danger} />
-                </Pressable>
+                </TouchableOpacity>
               </View>
             </View>
           );
         })}
       </ScrollView>
 
-      <Modal visible={open} transparent animationType="fade">
-        <Pressable style={styles.modalBg} onPress={() => setOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Nouvel objectif</Text>
-            <TextInput
-              style={styles.in}
-              placeholder="Nom"
-              placeholderTextColor={colors.textMuted}
-              value={name}
-              onChangeText={setName}
-            />
-            <TextInput
-              style={styles.in}
-              placeholder="Objectif (montant)"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="decimal-pad"
-              value={target}
-              onChangeText={setTarget}
-            />
-            <TextInput
-              style={styles.in}
-              placeholder="Déjà épargné (optionnel)"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="decimal-pad"
-              value={saved}
-              onChangeText={setSaved}
-            />
-            <View style={styles.modalRow}>
-              <Pressable onPress={() => setOpen(false)}>
-                <Text style={styles.cancel}>Annuler</Text>
-              </Pressable>
-              <Pressable onPress={submit}>
-                <Text style={styles.ok}>Créer</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <SilkyModalize
+        ref={goalModalRef}
+        adjustToContentHeight
+        childrenStyle={styles.modalChildren}
+        onClosed={() => {
+          setName('');
+          setTarget('');
+          setSaved('');
+        }}
+        scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}>
+        <Text style={styles.modalTitle}>Nouvel objectif</Text>
+        <TextInput
+          style={styles.in}
+          placeholder="Nom"
+          placeholderTextColor={colors.textMuted}
+          value={name}
+          onChangeText={setName}
+        />
+        <TextInput
+          style={styles.in}
+          placeholder="Objectif (montant)"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="decimal-pad"
+          value={target}
+          onChangeText={setTarget}
+        />
+        <TextInput
+          style={styles.in}
+          placeholder="Déjà épargné (optionnel)"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="decimal-pad"
+          value={saved}
+          onChangeText={setSaved}
+        />
+        <View style={styles.modalBtnRow}>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            style={styles.modalBtnGhost}
+            onPress={() => goalModalRef.current?.close()}>
+            <Text style={styles.modalBtnGhostLabel}>Annuler</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.88} style={styles.modalBtnPrimary} onPress={submit}>
+            <Text style={styles.modalBtnPrimaryLabel}>Créer</Text>
+          </TouchableOpacity>
+        </View>
+      </SilkyModalize>
     </UchumiScreen>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, paddingTop: spacing.sm },
-  scroll: { paddingHorizontal: spacing.md, gap: spacing.md },
-  add: { borderRadius: 14, overflow: 'hidden', marginBottom: spacing.sm },
+  scroll: { gap: spacing.md },
+  addTouchable: { borderRadius: 14, overflow: 'hidden', marginBottom: spacing.sm },
   addGrad: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.md,
   },
-  addText: { color: colors.textPrimary, fontWeight: '800', fontSize: 16 },
-  pressed: { opacity: 0.9 },
+  addText: { color: colors.textOnDark, fontWeight: '800', fontSize: 16 },
   card: {
     backgroundColor: colors.dune,
     borderRadius: 16,
-    padding: spacing.md,
+    padding: spacing.md + 4,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   goalName: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
   goalAmt: { fontSize: 14, color: colors.textSecondary },
@@ -191,45 +208,84 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fill: { height: '100%', borderRadius: 5 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   miniIn: {
     flex: 1,
-    backgroundColor: colors.marshland,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.fuscousGray,
-    color: colors.textPrimary,
-    padding: Platform.OS === 'ios' ? 10 : 8,
-    fontSize: 15,
-  },
-  modalBg: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: colors.dune,
-    borderRadius: 18,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
-  in: {
     backgroundColor: colors.marshland,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.fuscousGray,
     color: colors.textPrimary,
-    padding: 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    paddingHorizontal: spacing.md,
+    fontSize: 15,
+  },
+  iconBtn: {
+    padding: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: 'rgba(232, 93, 76, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 93, 76, 0.2)',
+  },
+  modalChildren: {
+    gap: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+    letterSpacing: -0.3,
+  },
+  in: {
+    backgroundColor: colors.marshland,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+    color: colors.textPrimary,
+    paddingVertical: Platform.OS === 'ios' ? 16 : 14,
+    paddingHorizontal: spacing.md,
+    fontSize: 16,
+    minHeight: 52,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.fuscousGray,
+  },
+  modalBtnGhost: {
+    flex: 1,
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+    backgroundColor: colors.marshland,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnGhostLabel: {
+    color: colors.textSecondary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalBtnPrimary: {
+    flex: 1,
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 14,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnPrimaryLabel: {
+    color: colors.textOnDark,
+    fontWeight: '800',
     fontSize: 16,
   },
-  modalRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.lg,
-    marginTop: spacing.sm,
-  },
-  cancel: { color: colors.textMuted, fontSize: 16 },
-  ok: { color: colors.accent, fontWeight: '800', fontSize: 16 },
 });
