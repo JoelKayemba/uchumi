@@ -282,6 +282,8 @@ const PRESETS: Subscription['preset'][] = [
   'netflix',
   'spotify',
   'amazon_prime',
+  'canva',
+  'chatgpt',
   'disney',
   'youtube',
   'apple',

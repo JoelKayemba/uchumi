@@ -15,8 +15,9 @@ export function SubscriptionPresetLogo({ preset, size = 52 }: Props) {
   const meta = SUBSCRIPTION_PRESET_META[preset];
   const [failed, setFailed] = useState(false);
   const url = meta.logoUrl;
+  const source = meta.logoAsset ?? (url ? { uri: url } : null);
 
-  if (!url || failed) {
+  if (!source || failed) {
     return (
       <View
         style={[
@@ -31,7 +32,7 @@ export function SubscriptionPresetLogo({ preset, size = 52 }: Props) {
 
   return (
     <Image
-      source={{ uri: url }}
+      source={source}
       style={{ width: size, height: size, borderRadius: size * 0.27 }}
       contentFit="contain"
       transition={120}

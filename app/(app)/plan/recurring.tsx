@@ -22,7 +22,6 @@ import { ScreenHeader } from '@/src/components/screen-header';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
 import { isDue } from '@/src/domain/recurring-due';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
-import { getExchangeRate } from '@/src/services/exchange-rates';
 import { useAppStore } from '@/src/store/use-app-store';
 import { colors } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
@@ -52,29 +51,23 @@ export default function RecurringScreen() {
       return;
     }
     const displayIso = currencyOptionToIso(currency);
-    try {
-      const rate = await getExchangeRate(displayIso, displayIso);
-      const amountInDisplay = n * rate;
-      addRule({
-        kind,
-        amount: n,
-        isoCurrency: displayIso,
-        rateToDisplayCurrency: rate,
-        amountInDisplayCurrency: amountInDisplay,
-        label: label.trim(),
-        categoryId: null,
-        frequency: freq,
-        dayOfMonth: freq === 'monthly' ? Math.min(28, dayjs().date()) : null,
-        weekday: freq === 'weekly' ? dayjs().day() : null,
-        nextDueAt: dayjs().startOf('day').toISOString(),
-        isActive: true,
-      });
-      setLabel('');
-      setAmount('');
-      recurringModalRef.current?.close();
-    } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Conversion');
-    }
+    addRule({
+      kind,
+      amount: n,
+      isoCurrency: displayIso,
+      rateToDisplayCurrency: 1,
+      amountInDisplayCurrency: n,
+      label: label.trim(),
+      categoryId: null,
+      frequency: freq,
+      dayOfMonth: freq === 'monthly' ? Math.min(28, dayjs().date()) : null,
+      weekday: freq === 'weekly' ? dayjs().day() : null,
+      nextDueAt: dayjs().startOf('day').toISOString(),
+      isActive: true,
+    });
+    setLabel('');
+    setAmount('');
+    recurringModalRef.current?.close();
   };
 
   return (

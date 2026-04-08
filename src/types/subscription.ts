@@ -9,6 +9,8 @@ export type SubscriptionPreset =
   | 'netflix'
   | 'spotify'
   | 'amazon_prime'
+  | 'canva'
+  | 'chatgpt'
   | 'disney'
   | 'youtube'
   | 'apple'

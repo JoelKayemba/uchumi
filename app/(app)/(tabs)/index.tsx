@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdBannerSlot } from '@/src/components/ad-banner-slot';
@@ -18,7 +19,6 @@ import { HomeHeroLime } from '@/src/components/dashboard/home-hero-lime';
 import { SubscriptionCarousel } from '@/src/components/dashboard/subscription-carousel';
 import { WeekBars } from '@/src/components/dashboard/week-bars';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
-import { computeAvailable } from '@/src/domain/balance';
 import { subscriptionAmountToDisplay } from '@/src/domain/subscription-amount';
 import { last7DaysBars } from '@/src/domain/dashboard-charts';
 import { isDue } from '@/src/domain/recurring-due';
@@ -27,6 +27,8 @@ import {
   filterTransactionsToday,
   sumByKind,
 } from '@/src/domain/stats';
+import { formatCurrencyIso } from '@/src/lib/format-currency';
+import { availableByIso, formatIsoTotals, sumByIso } from '@/src/lib/multi-currency';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
 import { colors, TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
@@ -40,7 +42,6 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const formatCurrency = useFormatCurrency();
-  const appMode = useAppStore((s) => s.appMode);
   const transactions = useAppStore((s) => s.transactions);
   const categories = useAppStore((s) => s.categories);
   const reminderEnabled = useAppStore((s) => s.reminderEnabled);
@@ -53,16 +54,26 @@ export default function DashboardScreen() {
   const subscriptions = useAppStore((s) => s.subscriptions);
   const displayCurrency = useAppStore((s) => s.currency);
 
-  const available = computeAvailable(transactions);
+  const availablePerIso = useMemo(() => availableByIso(transactions), [transactions]);
+  const availableLabel = useMemo(
+    () => formatIsoTotals(availablePerIso),
+    [availablePerIso]
+  );
   const hasMovements = transactions.length > 0;
 
   const todayTx = useMemo(
     () => filterTransactionsToday(transactions),
     [transactions]
   );
-  const todayTotals = useMemo(() => sumByKind(todayTx), [todayTx]);
   const hasToday = todayTx.length > 0;
-  const sortiesJour = todayTotals.expense + todayTotals.savings;
+  const sortiesJourByIso = useMemo(
+    () => sumByIso(todayTx, ['expense', 'savings']),
+    [todayTx]
+  );
+  const sortiesJourLabel = useMemo(
+    () => formatIsoTotals(sortiesJourByIso),
+    [sortiesJourByIso]
+  );
 
   const monthFiltered = useMemo(
     () => filterByPeriod(transactions, 'month'),
@@ -105,6 +116,12 @@ export default function DashboardScreen() {
     const loanTotal = loans.reduce((a, l) => a + l.monthlyPayment, 0);
     return subTotal + loanTotal;
   }, [subscriptions, loans, displayCurrency]);
+  const dayProgress = hasToday ? Math.min(1, todayTx.length / 6) : 0;
+  const fixedItemsCount = useMemo(
+    () => subscriptions.filter((s) => s.isActive && s.isMonthlyRecurring).length + loans.length,
+    [subscriptions, loans]
+  );
+  const fixedProgress = Math.min(1, fixedItemsCount / 8);
 
   const recent = useMemo(() => {
     return [...transactions]
@@ -116,11 +133,6 @@ export default function DashboardScreen() {
 
   const catName = (id: string | null) =>
     id ? categories.find((c) => c.id === id)?.name ?? '—' : 'Sans catégorie';
-
-  const amountSigned = (t: Transaction) => {
-    if (t.kind === 'income') return `+${formatCurrency(t.amountInDisplayCurrency)}`;
-    return `−${formatCurrency(t.amountInDisplayCurrency)}`;
-  };
 
   const amountColor = (t: Transaction) => {
     if (t.kind === 'income') return colors.success;
@@ -158,58 +170,33 @@ export default function DashboardScreen() {
               accessibilityLabel="Notifications">
               <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
             </Pressable>
-            <View style={styles.modeBubble}>
-              <Ionicons
-                name={appMode === 'business' ? 'briefcase' : 'person'}
-                size={16}
-                color={colors.textPrimary}
-              />
-              <Text style={styles.modeBubbleText}>
-                {appMode === 'business' ? 'Activité' : 'Perso'}
-              </Text>
-            </View>
           </View>
         </View>
 
         <HomeHeroLime
           budgetProgress={budgetProgress}
-          balanceLabel={hasMovements ? formatCurrency(available) : '—'}
-          balanceHint={
-            hasMovements
-              ? 'Solde estimé (entrées − dépenses − épargne).'
-              : 'Ajoutez un mouvement pour suivre votre solde.'
-          }
+          balanceLabel={hasMovements ? availableLabel : '—'}
+          onPressAdd={() => router.push('/transaction/new')}
         />
-
-        <Pressable
-          onPress={() => router.push('/transaction/new')}
-          style={({ pressed }) => [styles.quickMove, pressed && styles.pressed]}>
-          <View style={styles.quickMoveIcon}>
-            <Ionicons name="add" size={26} color="#FFFFFF" />
-          </View>
-          <View style={styles.quickMoveText}>
-            <Text style={styles.quickMoveTitle}>Nouveau mouvement</Text>
-            <Text style={styles.quickMoveSub}>
-              Entrée, dépense ou épargne — saisie rapide
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={22} color={finShell.muted} />
-        </Pressable>
 
         <AdBannerSlot compactTop />
 
         <View style={styles.miniRow}>
           <View style={styles.miniCard}>
-            <Text style={styles.miniLabel}>Dépenses du jour</Text>
-            <Text style={styles.miniValue}>
-              {hasToday ? formatCurrency(sortiesJour) : '—'}
-            </Text>
+            <View style={styles.miniTop}>
+              <Text style={styles.miniLabel}>Dépenses du jour</Text>
+              <ProgressRing progress={dayProgress} color={colors.accent} />
+            </View>
+            <Text style={styles.miniValue}>{hasToday ? sortiesJourLabel : '—'}</Text>
             <Text style={styles.miniHint}>Sorties + épargne enregistrées</Text>
           </View>
           <Pressable
             onPress={() => router.push('/plan/subscriptions')}
             style={({ pressed }) => [styles.miniCard, pressed && styles.pressed]}>
-            <Text style={styles.miniLabel}>Charges fixes</Text>
+            <View style={styles.miniTop}>
+              <Text style={styles.miniLabel}>Charges fixes</Text>
+              <ProgressRing progress={fixedProgress} color={colors.subscriptionPurple} />
+            </View>
             <Text style={[styles.miniValue, { color: colors.subscriptionPurple }]}>
               {formatCurrency(fixedMonthlyForecast)}
             </Text>
@@ -219,7 +206,6 @@ export default function DashboardScreen() {
 
         <SubscriptionCarousel
           subscriptions={subscriptions}
-          displayCurrency={displayCurrency}
           onPressSubscription={() => router.push('/plan/subscriptions')}
           onPressSeeAll={() => router.push('/plan/subscriptions')}
         />
@@ -323,13 +309,49 @@ export default function DashboardScreen() {
                 </Text>
               </View>
               <Text style={[styles.txAmt, { color: amountColor(t) }]}>
-                {amountSigned(t)}
+                {t.kind === 'income' ? '+' : '−'}
+                {formatCurrencyIso(t.amount, t.isoCurrency)}
               </Text>
             </Pressable>
           ))
         )}
       </ScrollView>
     </UchumiScreen>
+  );
+}
+
+function ProgressRing({ progress, color }: { progress: number; color: string }) {
+  const size = 38;
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(1, progress));
+  const dash = c * p;
+  return (
+    <View style={styles.ringWrap}>
+      <Svg width={size} height={size}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={colors.fuscousGray}
+          strokeWidth={stroke}
+          fill="none"
+        />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={color}
+          strokeWidth={stroke}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${c}`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <Text style={styles.ringPct}>{Math.round(p * 100)}</Text>
+    </View>
   );
 }
 
@@ -341,7 +363,7 @@ const styles = StyleSheet.create({
   },
   container: {
     gap: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
@@ -380,22 +402,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textTransform: 'capitalize',
   },
-  modeBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    backgroundColor: colors.dune,
-    borderWidth: 1,
-    borderColor: colors.fuscousGray,
-  },
-  modeBubbleText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
   miniRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -419,6 +425,12 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  miniTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   miniLabel: {
     fontSize: 12,
     fontWeight: '700',
@@ -436,6 +448,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     lineHeight: 16,
+  },
+  ringWrap: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringPct: {
+    position: 'absolute',
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.textSecondary,
   },
   chartCard: {
     backgroundColor: colors.dune,
@@ -587,49 +611,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.88,
-  },
-  quickMove: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: finShell.card,
-    borderRadius: 24,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: finShell.border,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.07,
-        shadowRadius: 12,
-      },
-      android: { elevation: 2 },
-    }),
-  },
-  quickMoveIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: finShell.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickMoveText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  quickMoveTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: finShell.ink,
-    letterSpacing: -0.3,
-  },
-  quickMoveSub: {
-    fontSize: 12,
-    color: finShell.muted,
-    marginTop: 4,
-    lineHeight: 17,
   },
 });

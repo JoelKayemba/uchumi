@@ -10,9 +10,7 @@ import {
 } from 'react-native';
 
 import { SubscriptionPresetLogo } from '@/src/components/subscription-preset-logo';
-import type { CurrencyOptionId } from '@/src/constants/currencies';
 import { daysUntilNextBilling } from '@/src/domain/subscription-dates';
-import { subscriptionAmountToDisplay } from '@/src/domain/subscription-amount';
 import { formatCurrency } from '@/src/lib/format-currency';
 import { colors } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
@@ -20,7 +18,6 @@ import type { Subscription } from '@/src/types/subscription';
 
 type Props = {
   subscriptions: readonly Subscription[];
-  displayCurrency: CurrencyOptionId;
   onPressSubscription?: (sub: Subscription) => void;
   onPressSeeAll?: () => void;
 };
@@ -29,7 +26,6 @@ const CARD_W = 168;
 
 export function SubscriptionCarousel({
   subscriptions,
-  displayCurrency,
   onPressSubscription,
   onPressSeeAll,
 }: Props) {
@@ -67,12 +63,7 @@ export function SubscriptionCarousel({
         snapToInterval={CARD_W + spacing.sm}
         snapToAlignment="start">
         {rows.map(({ sub, days }) => {
-          const amt = subscriptionAmountToDisplay(
-            sub.amount,
-            sub.currencyId,
-            displayCurrency
-          );
-          const amtLabel = formatCurrency(amt, displayCurrency);
+          const amtLabel = formatCurrency(sub.amount, sub.currencyId);
           const isHighlight = sub.id === highlightId;
           const countdown =
             days === 0
@@ -96,7 +87,9 @@ export function SubscriptionCarousel({
                   end={{ x: 1, y: 1 }}
                   style={styles.cardInner}>
                   <View style={styles.cardTop}>
-                    <SubscriptionPresetLogo preset={sub.preset} size={44} />
+                    <View style={styles.logoFrameOn}>
+                      <SubscriptionPresetLogo preset={sub.preset} size={56} />
+                    </View>
                     <View style={styles.badgeLight}>
                       <Text style={styles.badgeLightText}>Bientôt</Text>
                     </View>
@@ -110,7 +103,9 @@ export function SubscriptionCarousel({
               ) : (
                 <View style={styles.cardMuted}>
                   <View style={styles.cardTop}>
-                    <SubscriptionPresetLogo preset={sub.preset} size={44} />
+                    <View style={styles.logoFrameOff}>
+                      <SubscriptionPresetLogo preset={sub.preset} size={56} />
+                    </View>
                   </View>
                   <Text style={styles.nameOff} numberOfLines={1}>
                     {sub.name}
@@ -182,6 +177,20 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
+  },
+  logoFrameOn: {
+    borderRadius: 16,
+    padding: 6,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.24)',
+  },
+  logoFrameOff: {
+    borderRadius: 16,
+    padding: 6,
+    backgroundColor: colors.marshland,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
   },
   badgeLight: {
     paddingHorizontal: 8,

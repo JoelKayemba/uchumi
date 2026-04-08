@@ -9,6 +9,7 @@ import {
   Switch,
   Text,
   TextInput,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -156,7 +157,6 @@ export default function SubscriptionsScreen() {
         {subscriptions.length > 0 ? (
           <SubscriptionCarousel
             subscriptions={subscriptions}
-            displayCurrency={defaultCurrency}
             onPressSubscription={openEdit}
           />
         ) : null}
@@ -407,11 +407,16 @@ export default function SubscriptionsScreen() {
               </ScrollView>
 
         <View style={styles.modalRow}>
-          <Pressable onPress={() => subscriptionModalRef.current?.close()}>
+          <TouchableOpacity
+            activeOpacity={0.88}
+            style={styles.modalBtnGhost}
+            onPress={() => subscriptionModalRef.current?.close()}>
             <Text style={styles.cancel}>Annuler</Text>
-          </Pressable>
+          </TouchableOpacity>
           {editingId ? (
-            <Pressable
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={styles.modalBtnDanger}
               onPress={() =>
                 Alert.alert('Supprimer ?', '', [
                   { text: 'Annuler', style: 'cancel' },
@@ -426,11 +431,11 @@ export default function SubscriptionsScreen() {
                 ])
               }>
               <Text style={styles.danger}>Supprimer</Text>
-            </Pressable>
+            </TouchableOpacity>
           ) : null}
-          <Pressable onPress={submit}>
+          <TouchableOpacity activeOpacity={0.88} style={styles.modalBtnPrimary} onPress={submit}>
             <Text style={styles.ok}>{editingId ? 'Enregistrer' : 'Ajouter'}</Text>
-          </Pressable>
+          </TouchableOpacity>
         </View>
       </SilkyModalize>
     </UchumiScreen>
@@ -549,6 +554,30 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.lg,
     flexWrap: 'wrap',
+  },
+  modalBtnGhost: {
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    backgroundColor: colors.marshland,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+  },
+  modalBtnDanger: {
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    backgroundColor: 'rgba(232, 93, 76, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 93, 76, 0.35)',
+  },
+  modalBtnPrimary: {
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md + 2,
+    borderRadius: 999,
+    backgroundColor: colors.accent + '22',
+    borderWidth: 1,
+    borderColor: colors.accent + '66',
   },
   cancel: { color: colors.textMuted, fontSize: 16 },
   ok: { color: colors.accent, fontWeight: '800', fontSize: 16 },

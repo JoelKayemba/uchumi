@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import {
   Pressable,
@@ -20,6 +21,8 @@ import {
   type StatsPeriod,
   sumByKind,
 } from '@/src/domain/stats';
+import { formatCurrencyIso } from '@/src/lib/format-currency';
+import { availableByIso } from '@/src/lib/multi-currency';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
 import { finShell } from '@/src/theme/fin-shell';
@@ -38,6 +41,21 @@ const VIVA = [
   finShell.green,
   finShell.orange,
 ];
+
+function signedLabelByIso(map: Map<string, number>): string {
+  const entries = [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  if (entries.length === 0) return '—';
+  return entries
+    .map(([iso, value]) => `${value >= 0 ? '+' : '−'}${formatCurrencyIso(Math.abs(value), iso)}`)
+    .join(' · ');
+}
+
+function subtractIsoMaps(a: Map<string, number>, b: Map<string, number>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [iso, v] of a) out.set(iso, v);
+  for (const [iso, v] of b) out.set(iso, (out.get(iso) ?? 0) - v);
+  return out;
+}
 
 export default function StatsScreen() {
   const router = useRouter();
@@ -64,6 +82,37 @@ export default function StatsScreen() {
     [transactions]
   );
   const netDelta = monthCompare.netCurrent - monthCompare.netPrevious;
+  const monthCurrentTx = useMemo(() => {
+    const start = dayjs().startOf('month').valueOf();
+    const end = dayjs().endOf('month').valueOf();
+    return transactions.filter((t) => {
+      const v = dayjs(t.createdAt).valueOf();
+      return v >= start && v <= end;
+    });
+  }, [transactions]);
+  const monthPreviousTx = useMemo(() => {
+    const start = dayjs().subtract(1, 'month').startOf('month').valueOf();
+    const end = dayjs().subtract(1, 'month').endOf('month').valueOf();
+    return transactions.filter((t) => {
+      const v = dayjs(t.createdAt).valueOf();
+      return v >= start && v <= end;
+    });
+  }, [transactions]);
+  const netCurrentByIso = useMemo(() => availableByIso(monthCurrentTx), [monthCurrentTx]);
+  const netPreviousByIso = useMemo(() => availableByIso(monthPreviousTx), [monthPreviousTx]);
+  const netDeltaByIso = useMemo(
+    () => subtractIsoMaps(netCurrentByIso, netPreviousByIso),
+    [netCurrentByIso, netPreviousByIso]
+  );
+  const netCurrentLabel = useMemo(
+    () => signedLabelByIso(netCurrentByIso),
+    [netCurrentByIso]
+  );
+  const netPreviousLabel = useMemo(
+    () => signedLabelByIso(netPreviousByIso),
+    [netPreviousByIso]
+  );
+  const netDeltaLabel = useMemo(() => signedLabelByIso(netDeltaByIso), [netDeltaByIso]);
 
   const top4 = useMemo(() => {
     const sorted = [...byCategory].sort((a, b) => b.total - a.total);
@@ -162,8 +211,7 @@ export default function StatsScreen() {
                     styles.compareValue,
                     monthCompare.netCurrent >= 0 ? styles.pos : styles.neg,
                   ]}>
-                  {monthCompare.netCurrent >= 0 ? '+' : '−'}
-                  {formatCurrency(Math.abs(monthCompare.netCurrent))}
+                  {netCurrentLabel}
                 </Text>
               </View>
               <View style={styles.compareCell}>
@@ -173,8 +221,7 @@ export default function StatsScreen() {
                     styles.compareValue,
                     monthCompare.netPrevious >= 0 ? styles.pos : styles.neg,
                   ]}>
-                  {monthCompare.netPrevious >= 0 ? '+' : '−'}
-                  {formatCurrency(Math.abs(monthCompare.netPrevious))}
+                  {netPreviousLabel}
                 </Text>
               </View>
             </View>
@@ -185,8 +232,7 @@ export default function StatsScreen() {
                 color={netDelta >= 0 ? finShell.green : finShell.orange}
               />
               <Text style={styles.deltaText}>
-                {netDelta >= 0 ? '+' : '−'}
-                {formatCurrency(Math.abs(netDelta))} vs mois précédent
+                {netDeltaLabel} vs mois précédent
               </Text>
             </View>
           </View>

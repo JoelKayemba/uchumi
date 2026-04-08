@@ -12,8 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UchumiScreen } from '@/src/components/uchumi-screen';
-import { computeAvailable } from '@/src/domain/balance';
-import { useFormatCurrency } from '@/src/hooks/use-format-currency';
+import { formatIsoTotals, availableByIso } from '@/src/lib/multi-currency';
 import { useAppStore } from '@/src/store/use-app-store';
 import { finShell } from '@/src/theme/fin-shell';
 import { TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
@@ -113,9 +112,9 @@ const MORE: {
 export default function PlanTabScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const formatCurrency = useFormatCurrency();
   const transactions = useAppStore((s) => s.transactions);
-  const balance = useMemo(() => computeAvailable(transactions), [transactions]);
+  const balanceByIso = useMemo(() => availableByIso(transactions), [transactions]);
+  const balanceLabel = useMemo(() => formatIsoTotals(balanceByIso), [balanceByIso]);
 
   return (
     <UchumiScreen style={styles.screen}>
@@ -127,7 +126,7 @@ export default function PlanTabScreen() {
         showsVerticalScrollIndicator={false}>
         <Text style={styles.kicker}>Plan financier</Text>
         <Text style={styles.balanceLabel}>Solde principal</Text>
-        <Text style={styles.balance}>{formatCurrency(balance)}</Text>
+        <Text style={styles.balance}>{balanceLabel}</Text>
         <Text style={styles.disclaimer}>
           Données locales — budgets, objectifs, récurrence et crédits.
         </Text>
@@ -164,20 +163,18 @@ export default function PlanTabScreen() {
               style={({ pressed }) => [
                 styles.tile,
                 pressed && styles.pressed,
-                { borderColor: item.color + '44' },
+                { backgroundColor: item.color },
               ]}>
-              <View style={[styles.tileTab, { backgroundColor: item.color }]} />
               <View style={styles.tileInner}>
-                <View
-                  style={[
-                    styles.tileIconBg,
-                    { backgroundColor: item.color + '18' },
-                  ]}>
-                  <Ionicons name={item.icon} size={22} color={item.color} />
+                <View style={styles.tileTop}>
+                  <View style={styles.tileIconBg}>
+                    <Ionicons name={item.icon} size={22} color="#FFFFFF" />
+                  </View>
+                  <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.88)" />
                 </View>
                 <Text style={styles.tileTitle}>{item.title}</Text>
                 <Text style={styles.tileSub}>{item.sub}</Text>
-                <Text style={[styles.tileAmt, { color: item.color }]}>Voir</Text>
+                <Text style={styles.tileAmt}>Ouvrir</Text>
               </View>
             </Pressable>
           ))}
@@ -308,8 +305,7 @@ const styles = StyleSheet.create({
   tile: {
     width: '48%',
     borderRadius: 24,
-    backgroundColor: finShell.card,
-    borderWidth: 1,
+    borderWidth: 0,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
@@ -321,38 +317,40 @@ const styles = StyleSheet.create({
       android: { elevation: 3 },
     }),
   },
-  tileTab: {
-    height: 8,
-    width: '100%',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
   tileInner: {
     padding: spacing.md,
-    gap: 4,
+    gap: 6,
+    minHeight: 156,
+  },
+  tileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
   },
   tileIconBg: {
     width: 44,
     height: 44,
     borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
   },
   tileTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: finShell.ink,
+    color: '#FFFFFF',
   },
   tileSub: {
     fontSize: 12,
-    color: finShell.muted,
+    color: 'rgba(255,255,255,0.9)',
     lineHeight: 16,
   },
   tileAmt: {
-    marginTop: spacing.sm,
+    marginTop: 'auto',
     fontSize: 13,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
   listRow: {
     flexDirection: 'row',

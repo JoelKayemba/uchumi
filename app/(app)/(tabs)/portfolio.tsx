@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
@@ -17,9 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/src/components/screen-header';
 import { UchumiScreen } from '@/src/components/uchumi-screen';
-import { computeAvailable } from '@/src/domain/balance';
-import { monthDailyOutflow, monthTotalOutflow } from '@/src/domain/portfolio-chart';
+import { monthDailyOutflow } from '@/src/domain/portfolio-chart';
 import { useFormatCurrency } from '@/src/hooks/use-format-currency';
+import { formatCurrencyIso } from '@/src/lib/format-currency';
+import { availableByIso, formatIsoTotals, sumByIso } from '@/src/lib/multi-currency';
 import { useAppStore } from '@/src/store/use-app-store';
 import { finShell } from '@/src/theme/fin-shell';
 import { TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
@@ -45,9 +47,21 @@ export default function PortfolioScreen() {
   const transactions = useAppStore((s) => s.transactions);
   const [query, setQuery] = useState('');
 
-  const balance = useMemo(() => computeAvailable(transactions), [transactions]);
+  const balanceByIso = useMemo(() => availableByIso(transactions), [transactions]);
+  const balanceLabel = useMemo(() => formatIsoTotals(balanceByIso), [balanceByIso]);
   const daily = useMemo(() => monthDailyOutflow(transactions), [transactions]);
-  const monthOut = useMemo(() => monthTotalOutflow(transactions), [transactions]);
+  const monthOutByIso = useMemo(
+    () =>
+      sumByIso(
+        transactions.filter(
+          (t) =>
+            dayjs(t.createdAt).valueOf() >= dayjs().startOf('month').valueOf() &&
+            (t.kind === 'expense' || t.kind === 'savings')
+        )
+      ),
+    [transactions]
+  );
+  const monthOutLabel = useMemo(() => formatIsoTotals(monthOutByIso), [monthOutByIso]);
 
   const lineData = useMemo(
     () => daily.map((d) => ({ value: Math.round(d.value * 100) / 100 })),
@@ -82,10 +96,9 @@ export default function PortfolioScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
         <LinearHeroCard
-          balance={balance}
-          monthOut={monthOut}
+          balanceLabel={balanceLabel}
+          monthOutLabel={monthOutLabel}
           periodLabel={periodLabel}
-          formatCurrency={formatCurrency}
         />
 
         <View style={styles.chartCard}>
@@ -194,7 +207,7 @@ export default function PortfolioScreen() {
                   t.kind === 'income' ? styles.amtIn : styles.amtOut,
                 ]}>
                 {t.kind === 'income' ? '+' : '−'}
-                {formatCurrency(t.amountInDisplayCurrency)}
+                {formatCurrencyIso(t.amount, t.isoCurrency)}
               </Text>
             </Pressable>
           ))
@@ -205,30 +218,36 @@ export default function PortfolioScreen() {
 }
 
 function LinearHeroCard({
-  balance,
-  monthOut,
+  balanceLabel,
+  monthOutLabel,
   periodLabel,
-  formatCurrency,
 }: {
-  balance: number;
-  monthOut: number;
+  balanceLabel: string;
+  monthOutLabel: string;
   periodLabel: string;
-  formatCurrency: (n: number) => string;
 }) {
   return (
-    <View style={styles.hero}>
+    <LinearGradient
+      colors={['#16181D', '#232734']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.hero}>
       <View style={styles.heroTop}>
-        <View style={styles.heroIcon}>
-          <Ionicons name="wallet" size={26} color={finShell.purple} />
+        <View style={styles.heroChip}>
+          <View style={styles.heroChipInner} />
         </View>
         <Text style={styles.heroPeriod}>{periodLabel}</Text>
       </View>
       <Text style={styles.heroLabel}>Solde disponible</Text>
-      <Text style={styles.heroBalance}>{formatCurrency(balance)}</Text>
+      <Text style={styles.heroBalance}>{balanceLabel}</Text>
       <Text style={styles.heroHint}>
-        Sorties du mois : {formatCurrency(monthOut)}
+        Sorties du mois : {monthOutLabel}
       </Text>
-    </View>
+      <View style={styles.heroBrand}>
+        <Ionicons name="wallet" size={14} color="#D6DAE6" />
+        <Text style={styles.heroBrandText}>UCHUMI CARD</Text>
+      </View>
+    </LinearGradient>
   );
 }
 
@@ -242,16 +261,15 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   hero: {
-    backgroundColor: finShell.card,
+    backgroundColor: '#1A1E29',
     borderRadius: 28,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: finShell.border,
+    borderWidth: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 4,
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 8,
   },
   heroTop: {
     flexDirection: 'row',
@@ -259,37 +277,58 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  heroIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(138,112,245,0.12)',
+  heroChip: {
+    width: 44,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#D9BE79',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  heroChipInner: {
+    width: 28,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.22)',
   },
   heroPeriod: {
     fontSize: 13,
     fontWeight: '700',
-    color: finShell.sub,
+    color: '#B8C0D4',
     textTransform: 'capitalize',
   },
   heroLabel: {
     fontSize: 13,
-    color: finShell.muted,
+    color: '#A7AFC3',
     fontWeight: '600',
   },
   heroBalance: {
     fontSize: 34,
     fontWeight: '800',
-    color: finShell.ink,
+    color: '#FFFFFF',
     letterSpacing: -1,
     marginTop: 4,
   },
   heroHint: {
     marginTop: spacing.sm,
     fontSize: 14,
-    color: finShell.sub,
+    color: '#C8D0E0',
     fontWeight: '600',
+  },
+  heroBrand: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    opacity: 0.9,
+  },
+  heroBrandText: {
+    color: '#D6DAE6',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   chartCard: {
     backgroundColor: finShell.card,

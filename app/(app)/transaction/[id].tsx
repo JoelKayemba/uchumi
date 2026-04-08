@@ -1,11 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { currencyOptionToIso } from '@/src/constants/currencies';
 import { ScreenHeader } from '@/src/components/screen-header';
 import { TransactionForm } from '@/src/components/transaction-form';
-import { getExchangeRate } from '@/src/services/exchange-rates';
 import { useAppStore } from '@/src/store/use-app-store';
 import { colors } from '@/src/theme';
 import { spacing } from '@/src/theme/spacing';
@@ -44,29 +43,19 @@ export default function EditTransactionScreen() {
       initialNote={transaction.note}
       initialAttachmentUri={transaction.attachmentUri}
       onSubmit={async (values) => {
-        const displayIso = currencyOptionToIso(currency);
-        try {
-          const rate = await getExchangeRate(values.isoCurrency, displayIso);
-          const amountInDisplay = values.amount * rate;
-          updateTransaction(transaction.id, {
-            kind: values.kind,
-            amount: values.amount,
-            isoCurrency: values.isoCurrency,
-            rateToDisplayCurrency: rate,
-            amountInDisplayCurrency: amountInDisplay,
-            label: values.label,
-            categoryId: values.categoryId,
-            tags: values.tags,
-            note: values.note,
-            attachmentUri: values.attachmentUri,
-          });
-          router.back();
-        } catch (e) {
-          Alert.alert(
-            'Conversion impossible',
-            e instanceof Error ? e.message : 'Erreur inconnue.'
-          );
-        }
+        updateTransaction(transaction.id, {
+          kind: values.kind,
+          amount: values.amount,
+          isoCurrency: values.isoCurrency,
+          rateToDisplayCurrency: 1,
+          amountInDisplayCurrency: values.amount,
+          label: values.label,
+          categoryId: values.categoryId,
+          tags: values.tags,
+          note: values.note,
+          attachmentUri: values.attachmentUri,
+        });
+        router.back();
       }}
     />
   );

@@ -13,6 +13,7 @@ import {
   Switch,
   Text,
   TextInput,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -75,15 +76,6 @@ export default function SettingsScreen() {
   const setWeeklySummaryPreferences = useAppStore(
     (s) => s.setWeeklySummaryPreferences
   );
-  const clearTransactions = useAppStore((s) => s.clearTransactions);
-  const clearCategoryBudgets = useAppStore((s) => s.clearCategoryBudgets);
-  const clearSavingsGoals = useAppStore((s) => s.clearSavingsGoals);
-  const clearRecurringRules = useAppStore((s) => s.clearRecurringRules);
-  const clearLoans = useAppStore((s) => s.clearLoans);
-  const clearSubscriptions = useAppStore((s) => s.clearSubscriptions);
-  const clearMarketWatchlist = useAppStore((s) => s.clearMarketWatchlist);
-  const clearNotificationLog = useAppStore((s) => s.clearNotificationLog);
-  const purgeAllFinancialData = useAppStore((s) => s.purgeAllFinancialData);
 
   const [thresholdDraft, setThresholdDraft] = useState(
     () => (lowBalanceThreshold != null ? String(lowBalanceThreshold) : '')
@@ -239,11 +231,9 @@ export default function SettingsScreen() {
             </Text>
             <View style={styles.notifActions}>
               {notifAuth !== 'granted' ? (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.notifBtnPrimary,
-                    pressed && styles.pressed,
-                  ]}
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  style={styles.notifBtnPrimary}
                   onPress={async () => {
                     const s = await requestNotificationPermissions();
                     setNotifAuth(s);
@@ -258,19 +248,17 @@ export default function SettingsScreen() {
                       ? 'Redemander l’autorisation'
                       : 'Autoriser les notifications'}
                   </Text>
-                </Pressable>
+                </TouchableOpacity>
               ) : null}
               {notifAuth === 'denied' ? (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.notifBtnSecondary,
-                    pressed && styles.pressed,
-                  ]}
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  style={styles.notifBtnSecondary}
                   onPress={() => void openAppSettingsForNotifications()}>
                   <Text style={styles.notifBtnSecondaryText}>
                     Ouvrir les réglages du téléphone
                   </Text>
-                </Pressable>
+                </TouchableOpacity>
               ) : null}
             </View>
           </View>
@@ -400,11 +388,12 @@ export default function SettingsScreen() {
           />
         ) : null}
 
-        <Pressable
-          style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={styles.linkButtonBubble}
           onPress={() => router.push('/categories')}>
           <Text style={styles.linkLabel}>Gérer les catégories</Text>
-        </Pressable>
+        </TouchableOpacity>
 
         <Text style={styles.sectionLabel}>Aide & confidentialité</Text>
         <Pressable
@@ -426,134 +415,12 @@ export default function SettingsScreen() {
           <Text style={styles.valueChevron}>›</Text>
         </Pressable>
 
-        <View style={styles.dataBlock}>
-          <Text style={styles.reminderTitle}>Données locales (libérer l’espace)</Text>
-          <Text style={styles.reminderSub}>
-            Tout reste sur cet appareil. Supprimez ce que vous n’utilisez plus — devise et rappels ne
-            sont pas effacés sauf réinitialisation complète listée en bas.
-          </Text>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert(
-                'Supprimer tous les mouvements ?',
-                'Les soldes et statistiques seront recalculés à partir de zéro.',
-                [
-                  { text: 'Annuler', style: 'cancel' },
-                  {
-                    text: 'Supprimer',
-                    style: 'destructive',
-                    onPress: () => clearTransactions(),
-                  },
-                ]
-              )
-            }>
-            <Text style={styles.dataBtnLabel}>Supprimer tous les mouvements</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert(
-                'Réinitialiser les budgets par catégorie ?',
-                '',
-                [
-                  { text: 'Annuler', style: 'cancel' },
-                  { text: 'OK', onPress: () => clearCategoryBudgets() },
-                ]
-              )
-            }>
-            <Text style={styles.dataBtnLabel}>Effacer les plafonds de budget</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert('Supprimer tous les objectifs d’épargne ?', '', [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', style: 'destructive', onPress: () => clearSavingsGoals() },
-              ])
-            }>
-            <Text style={styles.dataBtnLabel}>Supprimer les objectifs</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert('Supprimer toutes les récurrences ?', '', [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', style: 'destructive', onPress: () => clearRecurringRules() },
-              ])
-            }>
-            <Text style={styles.dataBtnLabel}>Supprimer les récurrences</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert('Supprimer tous les prêts ?', '', [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', style: 'destructive', onPress: () => clearLoans() },
-              ])
-            }>
-            <Text style={styles.dataBtnLabel}>Supprimer les prêts</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert('Supprimer tous les abonnements ?', '', [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', style: 'destructive', onPress: () => clearSubscriptions() },
-              ])
-            }>
-            <Text style={styles.dataBtnLabel}>Supprimer les abonnements</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert(
-                'Réinitialiser la liste marché (AAPL, MSFT par défaut) ?',
-                '',
-                [
-                  { text: 'Annuler', style: 'cancel' },
-                  { text: 'OK', onPress: () => clearMarketWatchlist() },
-                ]
-              )
-            }>
-            <Text style={styles.dataBtnLabel}>Réinitialiser la liste marché</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtn, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert('Effacer le journal des notifications ?', '', [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'OK', onPress: () => clearNotificationLog() },
-              ])
-            }>
-            <Text style={styles.dataBtnLabel}>Effacer le journal des notifications</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dataBtnDanger, pressed && styles.pressed]}
-            onPress={() =>
-              Alert.alert(
-                'Tout réinitialiser ?',
-                'Mouvements, catégories par défaut, budgets, objectifs, récurrences, prêts, abonnements, liste marché et journal de notifications seront effacés. Vos réglages (devise, rappels) sont conservés.',
-                [
-                  { text: 'Annuler', style: 'cancel' },
-                  {
-                    text: 'Tout effacer',
-                    style: 'destructive',
-                    onPress: () => purgeAllFinancialData(),
-                  },
-                ]
-              )
-            }>
-            <Text style={styles.dataBtnDangerLabel}>Réinitialiser toutes les données financières</Text>
-          </Pressable>
-        </View>
-
         <Text style={styles.sectionLabel}>Sauvegarde</Text>
-        <Pressable
-          style={({ pressed }) => [
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={[
             styles.exportBtn,
             exporting && styles.exportDisabled,
-            pressed && !exporting && styles.pressed,
           ]}
           onPress={runExport}
           disabled={exporting}>
@@ -562,17 +429,17 @@ export default function SettingsScreen() {
           ) : (
             <Text style={styles.exportLabel}>Exporter mes données (JSON)</Text>
           )}
-        </Pressable>
+        </TouchableOpacity>
         <Text style={styles.exportHint}>
           Fichier partageable (mail, Drive, etc.). Aucune donnée n’est envoyée sur un serveur
           UCHUMI.
         </Text>
 
-        <Pressable
-          style={({ pressed }) => [
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={[
             styles.exportBtn,
             exportingCsv && styles.exportDisabled,
-            pressed && !exportingCsv && styles.pressed,
           ]}
           onPress={runExportCsv}
           disabled={exportingCsv}>
@@ -581,16 +448,16 @@ export default function SettingsScreen() {
           ) : (
             <Text style={styles.exportLabel}>Exporter les mouvements (CSV)</Text>
           )}
-        </Pressable>
+        </TouchableOpacity>
         <Text style={styles.exportHint}>
           Pour tableur : libellés, montants, tags, notes. Tout reste sur l’appareil.
         </Text>
 
-        <Pressable
-          style={({ pressed }) => [
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={[
             styles.exportBtn,
             importing && styles.exportDisabled,
-            pressed && !importing && styles.pressed,
           ]}
           onPress={runImport}
           disabled={importing}>
@@ -599,17 +466,18 @@ export default function SettingsScreen() {
           ) : (
             <Text style={styles.exportLabel}>Importer un fichier (JSON)</Text>
           )}
-        </Pressable>
+        </TouchableOpacity>
         <Text style={styles.exportHint}>
           Remplace vos catégories et mouvements par un export UCHUMI valide. Pensez à exporter
           avant si vous voulez garder une copie de l’état actuel.
         </Text>
 
-        <Pressable
-          style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={styles.linkButtonBubble}
           onPress={replayOnboarding}>
           <Text style={styles.linkLabel}>Revoir l’introduction (onboarding)</Text>
-        </Pressable>
+        </TouchableOpacity>
 
         <AdBannerSlot placeholderDetail="Réglages — emplacement réservé (AdMob en build natif)." />
       </ScrollView>
@@ -684,14 +552,15 @@ export default function SettingsScreen() {
             })}
           </View>
         ))}
-        <Pressable
+        <TouchableOpacity
+          activeOpacity={0.88}
           onPress={() => {
             setCurrencyQuery('');
             currencyModalRef.current?.close();
           }}
-          style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}>
+          style={styles.modalClose}>
           <Text style={styles.modalCloseText}>Fermer</Text>
-        </Pressable>
+        </TouchableOpacity>
       </SilkyModalize>
 
       {Platform.OS === 'ios' ? (
@@ -700,18 +569,22 @@ export default function SettingsScreen() {
           adjustToContentHeight
           scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}>
           <Text style={styles.timeModalSheetTitle}>Heure du rappel</Text>
-          <DateTimePicker
-            value={reminderDate}
-            mode="time"
-            display="spinner"
-            onChange={onTimeChange}
-            themeVariant="dark"
-          />
-          <Pressable
+          <View style={styles.timePickerIosWrap}>
+            <DateTimePicker
+              value={reminderDate}
+              mode="time"
+              display="spinner"
+              onChange={onTimeChange}
+              themeVariant="light"
+              textColor={colors.textPrimary}
+            />
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.88}
             style={styles.timeModalOk}
             onPress={() => timeModalRef.current?.close()}>
             <Text style={styles.timeModalOkText}>OK</Text>
-          </Pressable>
+          </TouchableOpacity>
         </SilkyModalize>
       ) : null}
     </UchumiScreen>
@@ -923,7 +796,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
+    marginTop: spacing.sm,
     textAlign: 'center',
+  },
+  timePickerIosWrap: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: colors.marshland,
+    borderRadius: 16,
+    overflow: 'hidden',
+    paddingVertical: spacing.xs,
   },
   timeModalOk: {
     alignItems: 'center',
@@ -938,6 +820,15 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingVertical: spacing.sm,
   },
+  linkButtonBubble: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    backgroundColor: colors.dune,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+  },
   pressed: {
     opacity: 0.7,
   },
@@ -946,47 +837,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textDecorationLine: 'underline',
   },
-  dataBlock: {
-    backgroundColor: colors.dune,
-    borderRadius: 16,
-    padding: spacing.md + 4,
-    borderWidth: 1,
-    borderColor: colors.fuscousGray,
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  dataBtn: {
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    backgroundColor: colors.marshland,
-    borderWidth: 1,
-    borderColor: colors.fuscousGray,
-  },
-  dataBtnLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  dataBtnDanger: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    backgroundColor: 'rgba(232, 93, 76, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(232, 93, 76, 0.35)',
-    marginTop: spacing.sm,
-  },
-  dataBtnDangerLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.danger,
-    textAlign: 'center',
-  },
   exportBtn: {
     backgroundColor: colors.dune,
     paddingVertical: spacing.md,
-    borderRadius: 12,
+    borderRadius: 999,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.fuscousGray,
@@ -1111,7 +965,12 @@ const styles = StyleSheet.create({
   modalClose: {
     marginTop: spacing.md,
     alignSelf: 'center',
-    padding: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.fuscousGray,
+    backgroundColor: colors.dune,
   },
   modalCloseText: {
     color: colors.textMuted,

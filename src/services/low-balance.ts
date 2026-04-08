@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 
+import { currencyOptionToIso } from '@/src/constants/currencies';
 import { NOTIF_HREF } from '@/src/constants/notification-routes';
 import { computeAvailable } from '@/src/domain/balance';
 import { formatCurrency } from '@/src/lib/format-currency';
@@ -23,7 +24,11 @@ export async function checkLowBalanceAfterTransactionsChange(): Promise<void> {
     return;
   }
 
-  const available = computeAvailable(transactions);
+  const currentIso = currencyOptionToIso(currency).toUpperCase();
+  const sameCurrencyTx = transactions.filter(
+    (t) => (t.isoCurrency || '').toUpperCase() === currentIso
+  );
+  const available = computeAvailable(sameCurrencyTx);
   const today = new Date().toDateString();
 
   if (available >= lowBalanceThreshold) {

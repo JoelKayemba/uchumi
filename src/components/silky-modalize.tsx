@@ -6,6 +6,7 @@ import {
   type ModalizeProps,
 } from 'react-native-modalize';
 
+import { TAB_BAR_FLOAT_BOTTOM_OFFSET } from '@/src/theme';
 import { finShell } from '@/src/theme/fin-shell';
 import { spacing } from '@/src/theme/spacing';
 
@@ -43,10 +44,11 @@ const handle: ViewStyle = {
   backgroundColor: 'rgba(138,112,245,0.45)',
 };
 
+/** Espace bas pour que le contenu ne soit pas masqué par la tab bar flottante sur les écrans à onglets. */
 const childrenPad: ViewStyle = {
   paddingHorizontal: spacing.md,
-  paddingTop: spacing.xs,
-  paddingBottom: spacing.lg,
+  paddingTop: spacing.lg,
+  paddingBottom: spacing.lg + TAB_BAR_FLOAT_BOTTOM_OFFSET,
 };
 
 export type SilkyModalizeProps = ModalizeProps;

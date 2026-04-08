@@ -11,6 +11,7 @@ import {
   getNextBillingDate,
   isBillingDayToday,
 } from '@/src/domain/subscription-dates';
+import { formatCurrency } from '@/src/lib/format-currency';
 import { useAppStore } from '@/src/store/use-app-store';
 import type { Subscription } from '@/src/types/subscription';
 
@@ -89,9 +90,7 @@ export async function cancelSubscriptionNotifications(subId: string): Promise<vo
 }
 
 function displayAmountLabel(sub: Subscription): string {
-  const display = useAppStore.getState().currency;
-  const v = subscriptionAmountToDisplay(sub.amount, sub.currencyId, display);
-  return Number.isFinite(v) ? v.toFixed(0) : '0';
+  return formatCurrency(sub.amount, sub.currencyId);
 }
 
 /**
@@ -138,7 +137,7 @@ export async function syncSubscriptionNotificationsFromStore(): Promise<void> {
         identifier: REM_ID(sub.id),
         content: {
           title: `UCHUMI — ${sub.name}`,
-          body: `Échéance dans ${sub.remindDaysBefore} jour(s) · ~${label} (devise d’affichage).`,
+          body: `Échéance dans ${sub.remindDaysBefore} jour(s) · ${label}.`,
           data: { href: NOTIF_HREF.subscriptions },
         },
         trigger: {
@@ -156,7 +155,7 @@ export async function syncSubscriptionNotificationsFromStore(): Promise<void> {
         identifier: DUE_ID(sub.id),
         content: {
           title: `UCHUMI — ${sub.name}`,
-          body: `Aujourd’hui : paiement / prélèvement prévu (~${label} en devise d’affichage).`,
+          body: `Aujourd’hui : paiement / prélèvement prévu (${label}).`,
           data: { href: NOTIF_HREF.subscriptions },
         },
         trigger: {

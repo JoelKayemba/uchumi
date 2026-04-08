@@ -7,7 +7,6 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -232,11 +231,7 @@ export function TransactionForm({
 
   return (
     <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}>
-        <View style={styles.layout}>
+      <View style={styles.layout}>
           {headerTitle ? (
             <ScreenHeader title={headerTitle} onBack={() => router.back()} />
           ) : null}
@@ -479,8 +474,7 @@ export function TransactionForm({
             </Text>
           ) : null}
         </View>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
