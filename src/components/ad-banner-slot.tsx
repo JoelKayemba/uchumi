@@ -112,9 +112,8 @@ function Placeholder({
         <AdSlotVisualMock reason={previewReason} />
       ) : null}
       <View style={styles.placeholder}>
-        <Text style={styles.placeholderText} numberOfLines={4}>
-          {detail ??
-            'Espace réservé — bannière AdMob (identique en production une fois le build configuré).'}
+        <Text style={styles.placeholderText} numberOfLines={2}>
+          Espace reserve pour les sponsorings.
         </Text>
       </View>
     </View>
