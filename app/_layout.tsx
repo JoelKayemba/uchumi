@@ -3,11 +3,12 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { AppErrorBoundary } from '@/src/components/app-error-boundary';
+import { AppLoadingOverlay } from '@/src/components/app-loading-overlay';
 import { NotificationNavigationBridge } from '@/src/components/notification-navigation-bridge';
 import { useStoreHydrated } from '@/src/hooks/use-store-hydrated';
 import { initMobileAdsSdk } from '@/src/services/ads-init';
@@ -62,6 +63,17 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!hydrated) return;
+    useAppStore.getState().syncLoanDeductions();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        useAppStore.getState().syncLoanDeductions();
+      }
+    });
+    return () => sub.remove();
+  }, [hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
     void syncReminderFromStore();
   }, [hydrated, reminderEnabled, reminderHour, reminderMinute]);
 
@@ -97,6 +109,7 @@ export default function RootLayout() {
                 options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: colors.marshland } }}
               />
             </Stack>
+            <AppLoadingOverlay visible={!hydrated} />
           </View>
           <StatusBar style="dark" />
         </AppErrorBoundary>

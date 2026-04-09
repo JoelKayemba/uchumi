@@ -14,6 +14,7 @@ import {
   isValidMarketSymbol,
   normalizeMarketSymbol,
 } from '@/src/lib/market-symbol';
+import { applyLoanAccruals } from '@/src/domain/loan-accrual';
 import { nextStreak } from '@/src/domain/streak';
 import { advanceNextDue } from '@/src/domain/recurring-due';
 import type { AppMode } from '@/src/types/app';
@@ -153,6 +154,8 @@ type AppState = {
   addLoan: (input: Omit<Loan, 'id'>) => void;
   updateLoan: (id: string, patch: Partial<Loan>) => void;
   deleteLoan: (id: string) => void;
+  /** Met à jour les soldes des prêts selon les mensualités dues (à l’ouverture / reprise app). */
+  syncLoanDeductions: () => void;
   addSubscription: (input: Omit<Subscription, 'id'>) => void;
   updateSubscription: (id: string, patch: Partial<Subscription>) => void;
   deleteSubscription: (id: string) => void;
@@ -262,19 +265,72 @@ function ensureRecurringRules(raw: unknown): RecurringRule[] {
   return raw.filter((r): r is RecurringRule => r && typeof (r as RecurringRule).id === 'string');
 }
 
+function currentYearMonth(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
 function ensureLoans(raw: unknown): Loan[] {
   if (!Array.isArray(raw)) return [];
+  const nowYm = currentYearMonth();
   return raw
     .filter((x): x is Loan => x && typeof (x as Loan).id === 'string')
-    .map((l) => ({
-      id: l.id,
-      name: typeof l.name === 'string' ? l.name : 'Prêt',
-      remainingAmount:
-        typeof l.remainingAmount === 'number' ? l.remainingAmount : 0,
-      monthlyPayment:
-        typeof l.monthlyPayment === 'number' ? l.monthlyPayment : 0,
-      note: typeof l.note === 'string' ? l.note : '',
-    }));
+    .map((l) => {
+      const row = l as Loan & {
+        totalAmount?: number;
+        debitDay?: number;
+        createdAt?: string;
+        lastProcessedMonth?: string | null;
+      };
+      const remaining =
+        typeof row.remainingAmount === 'number' ? row.remainingAmount : 0;
+      const monthly =
+        typeof row.monthlyPayment === 'number' ? row.monthlyPayment : 0;
+      const hasNewShape =
+        typeof row.totalAmount === 'number' &&
+        Number.isFinite(row.totalAmount) &&
+        row.totalAmount >= 0;
+      const totalAmount = hasNewShape
+        ? row.totalAmount
+        : Math.max(remaining, monthly);
+      const debitDay =
+        typeof row.debitDay === 'number' &&
+        row.debitDay >= 1 &&
+        row.debitDay <= 28
+          ? row.debitDay
+          : 1;
+      const createdAt =
+        typeof row.createdAt === 'string'
+          ? row.createdAt
+          : new Date(0).toISOString();
+      const isLegacy = !hasNewShape;
+      let lastProcessedMonth: string | null;
+      if (isLegacy) {
+        lastProcessedMonth = nowYm;
+      } else if (row.lastProcessedMonth === null) {
+        lastProcessedMonth = null;
+      } else if (
+        typeof row.lastProcessedMonth === 'string' &&
+        /^\d{4}-\d{2}$/.test(row.lastProcessedMonth)
+      ) {
+        lastProcessedMonth = row.lastProcessedMonth;
+      } else {
+        lastProcessedMonth = null;
+      }
+      return {
+        id: row.id,
+        name: typeof row.name === 'string' ? row.name : 'Prêt',
+        totalAmount: Math.max(totalAmount, remaining),
+        monthlyPayment: monthly,
+        remainingAmount: remaining,
+        debitDay,
+        createdAt,
+        lastProcessedMonth,
+        note: typeof row.note === 'string' ? row.note : '',
+      };
+    });
 }
 
 const PRESETS: Subscription['preset'][] = [
@@ -702,15 +758,21 @@ export const useAppStore = create<AppState>()(
           };
         }),
       addLoan: (input) =>
-        set((state) => ({
-          loans: [...state.loans, { ...input, id: randomUUID() }],
-        })),
+        set((state) => {
+          const next: Loan[] = [
+            ...state.loans,
+            { ...input, id: randomUUID() },
+          ];
+          return { loans: applyLoanAccruals(next) };
+        }),
       updateLoan: (id, patch) =>
         set((state) => ({
-          loans: state.loans.map((l) =>
-            l.id === id ? { ...l, ...patch } : l
+          loans: applyLoanAccruals(
+            state.loans.map((l) => (l.id === id ? { ...l, ...patch } : l))
           ),
         })),
+      syncLoanDeductions: () =>
+        set((state) => ({ loans: applyLoanAccruals(state.loans) })),
       deleteLoan: (id) =>
         set((state) => ({
           loans: state.loans.filter((l) => l.id !== id),
@@ -817,7 +879,7 @@ export const useAppStore = create<AppState>()(
           categoryBudgets: ensureBudgets(p?.categoryBudgets),
           savingsGoals: ensureSavingsGoals(p?.savingsGoals),
           recurringRules: ensureRecurringRules(p?.recurringRules),
-          loans: ensureLoans(p?.loans),
+          loans: applyLoanAccruals(ensureLoans(p?.loans)),
           subscriptions: ensureSubscriptions(p?.subscriptions),
           appLockEnabled:
             typeof p?.appLockEnabled === 'boolean'

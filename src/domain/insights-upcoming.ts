@@ -8,7 +8,9 @@ import type { Subscription } from '@/src/types/subscription';
 
 import { suggestNextWeekCeiling } from '@/src/domain/home-insights';
 import { subscriptionAmountToDisplay } from '@/src/domain/subscription-amount';
-import { getNextBillingDate } from '@/src/domain/subscription-dates';
+import {
+  getNextBillingDate,
+} from '@/src/domain/subscription-dates';
 
 dayjs.locale('fr');
 
@@ -69,12 +71,13 @@ export function buildUpcomingRows(
 
   for (const l of loans) {
     if (l.monthlyPayment <= 0) continue;
+    const next = getNextBillingDate(l.debitDay).hour(12).minute(0);
     rows.push({
       id: `loan-${l.id}`,
       title: l.name,
-      subtitle: 'Mensualité crédit (prévue chaque mois)',
+      subtitle: `Mensualité crédit · prélèvement le ${next.format('D MMMM')}`,
       amountDisplay: l.monthlyPayment,
-      sortAt: dayjs().endOf('month').valueOf(),
+      sortAt: next.valueOf(),
     });
   }
 
